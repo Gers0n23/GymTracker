@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sesión Activa - GymTracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .timer-badge {
+            background: var(--primary-variant);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .exercise-item {
+            border-left: 4px solid var(--primary);
+            padding-left: 15px;
+            margin-bottom: 30px;
+        }
+
+        .set-row {
+            display: grid;
+            grid-template-columns: 40px 1fr 1fr 50px;
+            gap: 10px;
+            align-items: center;
+            margin-top: 10px;
+            background: var(--glass);
+            padding: 10px;
+            border-radius: 8px;
+        }
+
+        .input-mini {
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: white;
+            padding: 5px;
+            border-radius: 4px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .check-circle {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid var(--primary);
+            cursor: pointer;
+        }
+
+        .check-circle.done {
+            background: var(--primary);
+            position: relative;
+        }
+
+        .check-circle.done::after {
+            content: '✓';
+            color: black;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 14px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <p style="font-size: 12px; opacity: 0.7;">Sesión en curso</p>
+                <h1>Empuje + Pecho</h1>
+            </div>
+            <div class="timer-badge">
+                <span>⏱️</span>
+                <span>00:42:15</span>
+            </div>
+        </header>
+
+        <section style="padding: 20px;">
+            <div class="exercise-item animate" style="animation-delay: 0.1s;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <h3 style="font-size: 18px;">Press de Banca</h3>
+                        <p style="font-size: 12px; opacity: 0.6;">Máquina / Barra</p>
+                    </div>
+                    <button class="btn-ghost" style="padding: 4px 8px; font-size: 10px;">HISTORIAL</button>
+                </div>
+
+                <div class="set-row">
+                    <span style="opacity: 0.5;">1</span>
+                    <input type="number" class="input-mini" value="80" placeholder="kg">
+                    <input type="number" class="input-mini" value="8" placeholder="reps">
+                    <div class="check-circle done"></div>
+                    <div style="grid-column: 1 / span 4;">
+                        <p style="font-size: 8px; opacity: 0.5; margin-bottom: 3px;">Reps in Reserve (RIR)</p>
+                        <div class="rir-container">
+                            <div class="rir-chip">0</div>
+                            <div class="rir-chip">1</div>
+                            <div class="rir-chip selected">2</div>
+                            <div class="rir-chip">3</div>
+                            <div class="rir-chip">4+</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="set-row" style="border: 1px solid #ffd700;">
+                    <span style="opacity: 0.5;">2</span>
+                    <input type="number" class="input-mini" value="85" style="color: #ffd700;">
+                    <input type="number" class="input-mini" value="8">
+                    <div class="check-circle done"></div>
+                    <div
+                        style="grid-column: 1 / span 4; display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+                        <span class="pr-badge">¡NUEVO PR! 🏆</span>
+                        <span style="font-size: 9px; opacity: 0.5;">RIR 1</span>
+                    </div>
+                </div>
+                <div class="set-row">
+                    <span style="opacity: 0.5;">3</span>
+                    <input type="number" class="input-mini" value="80" placeholder="kg">
+                    <input type="number" class="input-mini" value="" placeholder="reps">
+                    <div class="check-circle"></div>
+                </div>
+
+                <button class="btn btn-ghost" style="width: 100%; margin-top: 10px; font-size: 12px;">+ AGREGAR
+                    SERIE</button>
+            </div>
+
+            <div class="exercise-item animate" style="animation-delay: 0.2s; opacity: 0.5;">
+                <h3 style="font-size: 18px;">Aperturas en Contratractor</h3>
+                <p style="font-size: 12px; opacity: 0.6;">Máquina</p>
+                <div style="padding-top: 10px;">Esperando...</div>
+            </div>
+        </section>
+
+        <div style="padding: 0 20px 20px 20px;" class="animate" style="animation-delay: 0.3s;">
+            <div class="card" style="margin: 0; background: var(--primary-variant); color: white;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Descanso: <b>01:15</b></span>
+                    <button class="btn btn-primary"
+                        style="background: white; color: var(--primary-variant); padding: 5px 15px;">SALTAR</button>
+                </div>
+            </div>
+        </div>
+
+        <div style="padding: 0 20px;">
+            <button class="btn btn-primary" style="width: 100%;" onclick="location.href='dashboard.html'">FINALIZAR
+                SESIÓN</button>
+        </div>
+    </div>
+</body>
+
+</html>

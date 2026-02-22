@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Progreso - GymTracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .chart-placeholder {
+            width: 100%;
+            height: 200%;
+            min-height: 150px;
+            background: linear-gradient(0deg, var(--glass) 0%, transparent 100%);
+            border-bottom: 2px solid var(--primary);
+            position: relative;
+            margin: 20px 0;
+        }
+
+        .chart-placeholder::after {
+            content: '';
+            position: absolute;
+            top: 20%;
+            left: 0;
+            width: 100%;
+            height: 60%;
+            border-top: 1px dashed rgba(255, 255, 255, 0.1);
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+        }
+
+        .trend-up {
+            color: #00e676;
+        }
+
+        .trend-down {
+            color: #ff5252;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Progreso de Fuerza</h1>
+        </header>
+
+        <section style="padding: 15px;">
+            <div class="card animate" style="animation-delay: 0.1s;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3>Press de Banca</h3>
+                    <span class="trend-up">↑ 12%</span>
+                </div>
+                <div class="chart-placeholder">
+                    <!-- Virtual SVG Path for line chart -->
+                    <svg viewBox="0 0 100 40" style="width: 100%; height: 100px; overflow: visible;">
+                        <path d="M0,35 L20,30 L40,32 L60,25 L80,20 L100,10" fill="none" stroke="var(--primary)"
+                            stroke-width="2" />
+                        <circle cx="100" cy="10" r="3" fill="var(--primary)" />
+                    </svg>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; opacity: 0.6;">
+                    <span>Ene</span>
+                    <span>Hoy</span>
+                </div>
+            </div>
+
+            <div class="card animate" style="animation-delay: 0.2s;">
+                <h3>Hitos y Logros</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+                    <div style="background: var(--glass); padding: 10px; border-radius: 12px; text-align: center;">
+                        <span style="font-size: 24px;">🔥</span>
+                        <p style="font-size: 10px; margin-top: 5px;">Racha 12 días</p>
+                    </div>
+                    <div style="background: var(--glass); padding: 10px; border-radius: 12px; text-align: center;">
+                        <span style="font-size: 24px;">🐘</span>
+                        <p style="font-size: 10px; margin-top: 5px;">100kg Bench</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card animate" style="animation-delay: 0.3s;">
+                <h3>Alertas de Estancamiento</h3>
+                <p style="font-size: 14px; opacity: 0.8; margin-top: 10px;">⚠️ Llevas 3 sesiones sin progresar en
+                    "Sentadillas". Considera ajustar repeticiones o peso.</p>
+            </div>
+        </section>
+
+        <nav class="bottom-nav">
+            <a href="dashboard.html" class="nav-item">
+                <span class="nav-icon">🏠</span>
+                <span>Inicio</span>
+            </a>
+            <a href="routines.html" class="nav-item">
+                <span class="nav-icon">📋</span>
+                <span>Rutinas</span>
+            </a>
+            <a href="progression.html" class="nav-item active">
+                <span class="nav-icon">📈</span>
+                <span>Logros</span>
+            </a>
+            <a href="body_metrics.html" class="nav-item">
+                <span class="nav-icon">⚖️</span>
+                <span>Cuerpo</span>
+            </a>
+        </nav>
+    </div>
+</body>
+
+</html>

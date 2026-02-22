@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historial - GymTracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .history-item {
+            display: flex;
+            gap: 15px;
+            padding: 15px;
+            background: var(--glass);
+            border-radius: 16px;
+            margin-bottom: 12px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .date-badge {
+            width: 45px;
+            height: 45px;
+            background: var(--surface);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Historial</h1>
+        </header>
+
+        <section style="padding: 15px;">
+            <!-- Punto 1.5 PDF: Calendario Visual -->
+            <div class="card animate">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3>Febrero 2026</h3>
+                    <div style="display: flex; gap: 10px; opacity: 0.5;"><span>⬅️</span><span>➡️</span></div>
+                </div>
+                <div class="calendar-grid">
+                    <span style="opacity:0.3">26</span><span style="opacity:0.3">27</span><span
+                        style="opacity:0.3">28</span><span style="opacity:0.3">29</span><span
+                        style="opacity:0.3">30</span><span style="opacity:0.3">31</span><span
+                        class="calendar-day">1</span>
+                    <span class="calendar-day active">2</span><span class="calendar-day">3</span><span
+                        class="calendar-day active">4</span><span class="calendar-day">5</span><span
+                        class="calendar-day active">6</span><span class="calendar-day">7</span><span
+                        class="calendar-day">8</span>
+                    <span class="calendar-day active">9</span><span class="calendar-day">10</span><span
+                        class="calendar-day active">11</span><span class="calendar-day">12</span><span
+                        class="calendar-day active">13</span><span class="calendar-day">14</span><span
+                        class="calendar-day">15</span>
+                    <span class="calendar-day active">16</span><span class="calendar-day">17</span><span
+                        class="calendar-day active">18</span><span class="calendar-day">19</span><span
+                        class="calendar-day active">20</span><span class="calendar-day">21</span><span
+                        class="calendar-day active">22</span>
+                    <span class="calendar-day">23</span><span class="calendar-day">24</span><span
+                        class="calendar-day">25</span><span class="calendar-day">26</span><span
+                        class="calendar-day">27</span><span class="calendar-day">28</span><span
+                        style="opacity:0.3">1</span>
+                </div>
+            </div>
+
+            <h3 style="margin: 20px 0 15px 5px; font-size: 16px;">Sesiones Recientes</h3>
+
+            <div class="history-item animate" style="animation-delay: 0.1s;">
+                <div class="date-badge">
+                    <span style="font-weight: 700;">22</span>
+                    <span>FEB</span>
+                </div>
+                <div style="flex: 1;">
+                    <h4 style="font-size: 14px;">Empuje + Pecho</h4>
+                    <p style="font-size: 11px; opacity: 0.5;">72 min • 4,250 kg • RPE 8</p>
+                </div>
+                <span style="opacity: 0.3;">➡️</span>
+            </div>
+
+            <div class="history-item animate" style="animation-delay: 0.2s;">
+                <div class="date-badge">
+                    <span style="font-weight: 700;">20</span>
+                    <span>FEB</span>
+                </div>
+                <div style="flex: 1;">
+                    <h4 style="font-size: 14px;">Tracción + Espalda</h4>
+                    <p style="font-size: 11px; opacity: 0.5;">65 min • 3,800 kg • RPE 7</p>
+                </div>
+                <span style="opacity: 0.3;">➡️</span>
+            </div>
+        </section>
+
+        <nav class="bottom-nav">
+            <a href="dashboard.html" class="nav-item">
+                <span class="nav-icon">🏠</span>
+                <span>Inicio</span>
+            </a>
+            <a href="routines.html" class="nav-item">
+                <span class="nav-icon">📋</span>
+                <span>Rutinas</span>
+            </a>
+            <a href="history.html" class="nav-item active">
+                <span class="nav-icon">📅</span>
+                <span>Historial</span>
+            </a>
+            <a href="body_metrics.html" class="nav-item">
+                <span class="nav-icon">⚖️</span>
+                <span>Cuerpo</span>
+            </a>
+        </nav>
+    </div>
+</body>
+
+</html>

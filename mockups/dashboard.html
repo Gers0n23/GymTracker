@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GymTracker Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .summary-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px;
+        }
+
+        .stat-card {
+            background: var(--glass);
+            padding: 15px;
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 700;
+            display: block;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        .routine-preview {
+            margin: 15px;
+            padding: 20px;
+            background: linear-gradient(135deg, #2c3e50, #000000);
+            border-radius: 20px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .routine-preview::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(187, 134, 252, 0.1) 0%, transparent 70%);
+            z-index: 1;
+        }
+
+        .streak-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>FitTracker</h1>
+        </header>
+
+        <section style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 15px; margin: 15px;" class="animate"
+            style="animation-delay: 0.1s;">
+            <div class="card"
+                style="margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                <h3 style="font-size: 12px; margin-bottom: 10px; width: 100%;">Recuperación Muscular</h3>
+                <div class="muscle-map">
+                    <!-- Front view silhouette simplified -->
+                    <div class="muscle-indicator fatigued" style="top: 20%; left: 30%;"></div> <!-- Pecho L -->
+                    <div class="muscle-indicator fatigued" style="top: 20%; right: 30%;"></div> <!-- Pecho R -->
+                    <div class="muscle-indicator recovered" style="bottom: 30%; left: 30%;"></div> <!-- Pierna -->
+                    <div style="font-size: 40px; text-align: center; margin-top: 50px; opacity: 0.3;">👤</div>
+                </div>
+                <p style="font-size: 9px; opacity: 0.5; margin-top: 10px;">Pecho fatigado (42h rest)</p>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                <div class="stat-card" style="flex: 1;">
+                    <span class="stat-label">Volumen Semanal</span>
+                    <span class="stat-value" style="font-size: 18px;">12,450 kg</span>
+                    <div style="height: 4px; background: var(--glass); border-radius: 2px; margin-top: 10px;">
+                        <div style="width: 75%; height: 100%; background: var(--primary);"></div>
+                    </div>
+                </div>
+                <div class="stat-card" style="flex: 1;">
+                    <span class="stat-label">Series Efectivas</span>
+                    <div style="display: flex; gap: 5px; margin-top: 10px;">
+                        <div style="width: 8px; height: 15px; background: var(--primary); border-radius: 2px;"></div>
+                        <div style="width: 8px; height: 25px; background: var(--primary); border-radius: 2px;"></div>
+                        <div style="width: 8px; height: 20px; background: var(--primary); border-radius: 2px;"></div>
+                        <div style="width: 8px; height: 35px; background: var(--secondary); border-radius: 2px;"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="animate" style="animation-delay: 0.2s;">
+            <div class="routine-preview">
+                <p style="font-size: 11px; opacity: 0.8; color: var(--secondary);">¡Tus piernas están listas! ⚡</p>
+                <h2 style="font-size: 24px; margin-bottom: 5px;">Empuje + Pecho</h2>
+                <a href="active_session.html" class="btn btn-primary"
+                    style="display: block; text-decoration: none; margin-top: 15px;">Empezar sesión</a>
+            </div>
+        </section>
+
+        <section class="card animate" style="animation-delay: 0.3s;">
+            <h3>Progreso Semanal</h3>
+            <div
+                style="height: 100px; display: flex; align-items: flex-end; justify-content: space-around; padding-top: 20px;">
+                <div style="width: 20px; background: var(--primary); height: 40%; border-radius: 4px 4px 0 0;"></div>
+                <div style="width: 20px; background: var(--primary); height: 70%; border-radius: 4px 4px 0 0;"></div>
+                <div style="width: 20px; background: var(--primary); height: 90%; border-radius: 4px 4px 0 0;"></div>
+                <div style="width: 20px; background: var(--primary); height: 100%; border-radius: 4px 4px 0 0;"></div>
+                <div style="width: 20px; background: var(--glass); height: 20%; border-radius: 4px 4px 0 0;"></div>
+                <div style="width: 20px; background: var(--glass); height: 20%; border-radius: 4px 4px 0 0;"></div>
+                <div style="width: 20px; background: var(--glass); height: 20%; border-radius: 4px 4px 0 0;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-around; margin-top: 10px; font-size: 10px; opacity: 0.5;">
+                <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
+            </div>
+        </section>
+
+        <section class="card animate" style="animation-delay: 0.4s;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3>Estado Diario</h3>
+                    <p style="font-size: 12px; opacity: 0.7;">Calidad de sueño y energía</p>
+                </div>
+                <span style="font-size: 24px;">⚡</span>
+            </div>
+        </section>
+
+        <nav class="bottom-nav">
+            <a href="dashboard.html" class="nav-item active">
+                <span class="nav-icon">🏠</span>
+                <span>Inicio</span>
+            </a>
+            <a href="routines.html" class="nav-item">
+                <span class="nav-icon">📋</span>
+                <span>Rutinas</span>
+            </a>
+            <a href="progression.html" class="nav-item">
+                <span class="nav-icon">📈</span>
+                <span>Logros</span>
+            </a>
+            <a href="body_metrics.html" class="nav-item">
+                <span class="nav-icon">⚖️</span>
+                <span>Cuerpo</span>
+            </a>
+        </nav>
+    </div>
+</body>
+
+</html>

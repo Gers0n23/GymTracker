@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resumen de Sesión - GymTracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <header>
+            <h1>¡Buen Trabajo! 🏆</h1>
+            <p style="opacity: 0.6; font-size: 14px;">Has completado tu sesión de hoy.</p>
+        </header>
+
+        <section style="padding: 20px;">
+            <div class="card animate"
+                style="text-align: center; background: linear-gradient(135deg, var(--surface), #2d1b4d);">
+                <p style="font-size: 12px; opacity: 0.7;">TIEMPO TOTAL</p>
+                <h2 style="font-size: 36px; color: var(--primary);">01:12:45</h2>
+                <div style="display: flex; justify-content: space-around; margin-top: 15px;">
+                    <div>
+                        <p style="font-size: 10px; opacity: 0.5;">VOLUMEN</p>
+                        <b>4,250 kg</b>
+                    </div>
+                    <div>
+                        <p style="font-size: 10px; opacity: 0.5;">SERIES</p>
+                        <b>18</b>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Punto 1.3 PDF: RPE y Estado Diario -->
+            <div class="card animate" style="animation-delay: 0.1s;">
+                <h3 style="font-size: 16px; margin-bottom: 20px;">Estado de la Sesión</h3>
+
+                <div style="margin-bottom: 25px;">
+                    <label style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 10px;">
+                        <span>Esfuerzo Peribido (RPE)</span>
+                        <b id="rpeVal" style="color: var(--primary);">8</b>
+                    </label>
+                    <input type="range" min="1" max="10" value="8"
+                        oninput="document.getElementById('rpeVal').innerText=this.value">
+                    <div
+                        style="display: flex; justify-content: space-between; font-size: 9px; opacity: 0.5; margin-top: 5px;">
+                        <span>Muy fácil</span>
+                        <span>Al límite</span>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div>
+                        <label style="display: block; font-size: 12px; margin-bottom: 8px;">Calidad de Sueño</label>
+                        <div style="display: flex; gap: 5px;">
+                            <span style="font-size: 20px; opacity: 1;">😴</span>
+                            <span style="font-size: 20px; opacity: 0.3;">😴</span>
+                            <span style="font-size: 20px; opacity: 0.3;">😴</span>
+                            <span style="font-size: 20px; opacity: 0.3;">😴</span>
+                            <span style="font-size: 20px; opacity: 0.3;">😴</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 12px; margin-bottom: 8px;">Nivel de Energía</label>
+                        <div style="display: flex; gap: 5px;">
+                            <span style="font-size: 20px; opacity: 1;">⚡</span>
+                            <span style="font-size: 20px; opacity: 1;">⚡</span>
+                            <span style="font-size: 20px; opacity: 1;">⚡</span>
+                            <span style="font-size: 20px; opacity: 0.3;">⚡</span>
+                            <span style="font-size: 20px; opacity: 0.3;">⚡</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn btn-primary animate"
+                style="width: 100%; height: 60px; margin-top: 10px; animation-delay: 0.2s;"
+                onclick="location.href='dashboard.html'">GUARDAR Y FINALIZAR</button>
+        </section>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rutinas - GymTracker</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .routine-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .day-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            background: var(--glass);
+            border-radius: 4px;
+            font-size: 10px;
+            margin-right: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <header style="display: flex; justify-content: space-between; align-items: center;">
+            <h1>Tus Rutinas</h1>
+            <button class="btn btn-primary" style="padding: 8px 16px;">+ NUEVA</button>
+        </header>
+
+        <section style="padding: 10px;">
+            <div class="card routine-card animate" style="animation-delay: 0.1s; cursor: pointer;"
+                onclick="location.href='routine_preview.html'">
+                <div>
+                    <h3 style="margin-bottom: 5px;">Empuje + Pecho</h3>
+                    <div>
+                        <span class="day-badge">LUN</span>
+                        <span class="day-badge">JUE</span>
+                    </div>
+                    <p style="font-size: 12px; opacity: 0.6; margin-top: 10px;">6 ejercicios • Press banca, Aperturas...
+                    </p>
+                </div>
+                <div style="font-size: 20px;">➡️</div>
+            </div>
+
+            <div class="card routine-card animate" style="animation-delay: 0.2s;">
+                <div>
+                    <h3 style="margin-bottom: 5px;">Tracción + Espalda</h3>
+                    <div>
+                        <span class="day-badge">MAR</span>
+                        <span class="day-badge">VIE</span>
+                    </div>
+                    <p style="font-size: 12px; opacity: 0.6; margin-top: 10px;">5 ejercicios • Jalón al pecho, Remo...
+                    </p>
+                </div>
+                <div style="font-size: 20px;">➡️</div>
+            </div>
+
+            <div class="card routine-card animate" style="animation-delay: 0.3s;">
+                <div>
+                    <h3 style="margin-bottom: 5px;">Pierna + Postura</h3>
+                    <div>
+                        <span class="day-badge">MIE</span>
+                    </div>
+                    <p style="font-size: 12px; opacity: 0.6; margin-top: 10px;">5 ejercicios • Prensa, Extensiones...
+                    </p>
+                </div>
+                <div style="font-size: 20px;">➡️</div>
+            </div>
+        </section>
+
+        <nav class="bottom-nav">
+            <a href="dashboard.html" class="nav-item">
+                <span class="nav-icon">🏠</span>
+                <span>Inicio</span>
+            </a>
+            <a href="routines.html" class="nav-item active">
+                <span class="nav-icon">📋</span>
+                <span>Rutinas</span>
+            </a>
+            <a href="progression.html" class="nav-item">
+                <span class="nav-icon">📈</span>
+                <span>Logros</span>
+            </a>
+            <a href="body_metrics.html" class="nav-item">
+                <span class="nav-icon">⚖️</span>
+                <span>Cuerpo</span>
+            </a>
+        </nav>
+    </div>
+</body>
+
+</html>

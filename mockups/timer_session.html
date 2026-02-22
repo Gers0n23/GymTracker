@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sesión Activa - Timer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .timer-display {
+            font-size: 64px;
+            font-weight: 700;
+            text-align: center;
+            margin: 40px 0;
+            font-variant-numeric: tabular-nums;
+            color: var(--primary);
+            text-shadow: 0 0 20px rgba(187, 134, 252, 0.3);
+        }
+
+        .status-badge {
+            display: block;
+            text-align: center;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: var(--glass);
+            width: fit-content;
+            margin: 0 auto;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .active-exercise-card {
+            background: var(--surface);
+            border-radius: 24px;
+            padding: 30px;
+            margin: 20px;
+            border: 1px solid var(--primary);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .set-counter {
+            font-size: 20px;
+            opacity: 0.6;
+            margin-bottom: 10px;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            padding: 20px;
+        }
+
+        .resting {
+            color: var(--secondary) !important;
+            text-shadow: 0 0 20px rgba(3, 218, 198, 0.3) !important;
+        }
+
+        /* ... (estilos previos) ... */
+        .total-session-time {
+            font-size: 11px;
+            opacity: 0.5;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .finish-session-btn {
+            background: rgba(255, 107, 107, 0.1);
+            color: #ff6b6b;
+            border: 1px solid rgba(255, 107, 107, 0.2);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .finish-session-btn:hover {
+            background: rgba(255, 107, 107, 0.2);
+        }
+
+        /* Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .modal-card {
+            background: var(--surface);
+            padding: 25px;
+            border-radius: 24px;
+            width: 85%;
+            max-width: 320px;
+            border: 1px solid var(--glass-border);
+            text-align: center;
+        }
+
+        /* ... (mantener estilos previos de timer-display, etc) ... */
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header con tiempo global y botón finalizar -->
+        <header
+            style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--glass-border);">
+            <div>
+                <p class="total-session-time">Total: <span id="sessionTotalTimer">00:00</span></p>
+                <h1 style="font-size: 18px; margin-top: 2px;">Empuje + Pecho</h1>
+            </div>
+            <button class="finish-session-btn" onclick="showModal()">FINALIZAR</button>
+        </header>
+
+        <section class="active-exercise-card animate">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="set-counter">Serie 1 de 4</div>
+                    <h2 id="exerciseName">Press de Banca</h2>
+                </div>
+                <button class="btn-ghost" style="font-size: 16px;" onclick="toggleNotes()">📝</button>
+            </div>
+
+            <div id="timerContainer" class="timer-display">00:00</div>
+
+            <span id="statusLabel" class="status-badge">EN SERIE 🔥</span>
+
+            <!-- Campo de Notas (Punto 1.2 PDF) -->
+            <div id="notesArea" style="display: none; margin-top: 15px;">
+                <textarea placeholder="Ej: sentí dolor en hombro, subir peso..." rows="2"></textarea>
+            </div>
+        </section>
+
+        <!-- Toggle Ejercicio de Tiempo (Punto 1.2 PDF) -->
+        <div style="padding: 0 20px 10px 20px;">
+            <label style="font-size: 12px; opacity: 0.5; display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="timedMode"> Modo: Conteo de tiempo (Planchas, etc)
+            </label>
+        </div>
+
+        <section class="card" style="margin: 0 20px; padding: 15px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Objetivo: <b>80kg x 8 reps</b></span>
+                <div style="display: flex; gap: 10px;">
+                    <input type="number" value="80"
+                        style="width: 50px; background: var(--glass); border: none; color: white; border-radius: 4px; padding: 5px; text-align: center;">
+                    <input type="number" value="8"
+                        style="width: 40px; background: var(--glass); border: none; color: white; border-radius: 4px; padding: 5px; text-align: center;">
+                </div>
+            </div>
+        </section>
+
+        <div class="controls">
+            <button id="mainBtn" class="btn btn-primary" style="height: 70px; font-size: 18px;">FINALIZAR SERIE</button>
+            <button id="skipBtn" class="btn btn-ghost" style="display: none;">SALTAR DESCANSO</button>
+        </div>
+
+        <!-- Modal de Confirmación -->
+        <div id="confirmModal" class="modal-overlay">
+            <div class="modal-card">
+                <span style="font-size: 40px; display: block; margin-bottom: 10px;">🏆</span>
+                <h3>¿Terminar entrenamiento?</h3>
+                <p style="font-size: 13px; opacity: 0.6; margin-top: 10px; margin-bottom: 25px;">
+                    Se guardará tu progreso de hoy.<br>
+                    Tiempo total: <b id="finalTimeLabel">00:00</b>
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn btn-primary" onclick="finishEverything()">SÍ, TERMINAR</button>
+                    <button class="btn btn-ghost" onclick="hideModal()">CONTINUAR ENTRENANDO</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let seconds = 0;
+        let globalSeconds = 0;
+        let timerInterval;
+        let globalInterval;
+        let isResting = false;
+        let setNumber = 1;
+
+        const timerDisplay = document.getElementById('timerContainer');
+        const sessionTotalTimer = document.getElementById('sessionTotalTimer');
+        const statusLabel = document.getElementById('statusLabel');
+        const mainBtn = document.getElementById('mainBtn');
+        const skipBtn = document.getElementById('skipBtn');
+        const setCounter = document.querySelector('.set-counter');
+        const confirmModal = document.getElementById('confirmModal');
+        const finalTimeLabel = document.getElementById('finalTimeLabel');
+
+        function formatTime(s) {
+            const mins = Math.floor(Math.abs(s) / 60);
+            const secs = Math.abs(s) % 60;
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function startGlobalTimer() {
+            globalInterval = setInterval(() => {
+                globalSeconds++;
+                sessionTotalTimer.textContent = formatTime(globalSeconds);
+            }, 1000);
+        }
+
+        function startSeries() {
+            isResting = false;
+            seconds = 0;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                seconds++;
+                timerDisplay.textContent = formatTime(seconds);
+            }, 1000);
+
+            statusLabel.textContent = "EN SERIE 🔥";
+            statusLabel.style.color = "var(--primary)";
+            timerDisplay.classList.remove('resting');
+            mainBtn.textContent = "FINALIZAR SERIE";
+            mainBtn.className = "btn btn-primary";
+            setCounter.textContent = `Serie ${setNumber} de 4`;
+        }
+
+        function startRest() {
+            isResting = true;
+            seconds = 120;
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                seconds--;
+                if (seconds <= 0) {
+                    clearInterval(timerInterval);
+                    timerDisplay.textContent = "00:00";
+                    mainBtn.textContent = "COMENZAR SERIE " + (setNumber + 1);
+                    mainBtn.className = "btn btn-secondary";
+                    statusLabel.textContent = "LISTO ✅";
+                }
+                timerDisplay.textContent = formatTime(seconds);
+            }, 1000);
+
+            statusLabel.textContent = "DESCANSO ⏳";
+            statusLabel.style.color = "var(--secondary)";
+            timerDisplay.classList.add('resting');
+            mainBtn.textContent = "SALTAR DESCANSO";
+            mainBtn.className = "btn btn-ghost";
+            setNumber++;
+        }
+
+        function toggleNotes() {
+            const area = document.getElementById('notesArea');
+            area.style.display = area.style.display === 'none' ? 'block' : 'none';
+        }
+
+        mainBtn.onclick = () => {
+            const isTimedMode = document.getElementById('timedMode').checked;
+
+            if (!isResting) {
+                // Finalizamos serie
+                if (isTimedMode) {
+                    // Si es modo tiempo, guardamos el tiempo alcanzado como 'rep'
+                    console.log("Tiempo alcanzado: " + seconds);
+                }
+                startRest();
+            } else {
+                startSeries();
+            }
+        };
+
+        function showModal() {
+            finalTimeLabel.textContent = formatTime(globalSeconds);
+            confirmModal.style.display = 'flex';
+        }
+
+        function finishEverything() {
+            location.href = 'session_summary.html';
+        }
+
+        startGlobalTimer();
+        startSeries();
+    </script>
+</body>
+
+</html>

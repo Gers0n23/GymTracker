@@ -48,7 +48,7 @@ Para llevar estos mockups a una aplicación nativa, utilizaremos la siguiente ar
 
 ## 🏗️ Estado Actual del Proyecto
 - [x] **Cimientos**: Proyecto Android inicializado con Jetpack Compose.
-- [x] **Persistencia Cloud**: Integración completa con Firebase (Firestore, Auth, Analytics).
+- [x] **Persistencia Híbrida**: Integración con Firebase Firestore con soporte **Offline First** habilitado (sincronización automática).
 - [x] **Arquitectura**: Modelos de dominio implementados (User, Routine, Exercise, Workout, BodyMetrics).
 - [x] **Diseño Premium**: Sistema de temas "Glassmorphism" y colores basados en mockups.
 - [x] **Navegación**: NavHost configurado con rutas básicas.
@@ -58,20 +58,20 @@ Para llevar estos mockups a una aplicación nativa, utilizaremos la siguiente ar
 
 ## 🗺️ Roadmap de Desarrollo Actualizado
 
-### Fase 1: Motor de Datos y Rutinas (PRÓXIMAMENTE)
-- [ ] **Gestión de Rutinas**: Pantalla para listar y crear rutinas desde Firebase.
-- [ ] **Repositorios**: Implementar la lógica para leer/escribir en Firestore.
-- [ ] **Visualización de Ejercicios**: Detalle de cada rutina con su lista de ejercicios.
+### Fase 1: Motor de Datos y Rutinas (COMPLETADA)
+- [x] **Gestión de Rutinas**: Pantalla para listar y crear rutinas desde Firebase.
+- [x] **Repositorios**: Implementar la lógica para leer/escribir en Firestore.
+- [x] **Visualización de Ejercicios**: Detalle de cada rutina con su lista de ejercicios.
 
-### Fase 2: El Corazón del Entrenamiento
-- [ ] **Sesión Activa**: Cronómetro funcional y registro de series en tiempo real.
-- [ ] **Lógica de RPE/RIR**: Selector interactivo de esfuerzo percibido.
-- [ ] **Detección de PRs**: Alertas instantáneas al romper récords personales.
+### Fase 2: El Corazón del Entrenamiento (COMPLETADA)
+- [x] **Sesión Activa**: Cronómetro funcional y registro de series en tiempo real.
+- [x] **Lógica de RPE/RIR**: Selector interactivo de esfuerzo percibido.
+- [ ] **Detección de PRs**: Alertas instantáneas al romper récords personales (Pendiente lógica de comparación).
 
-### Fase 3: Análisis y Biometría
+### Fase 3: Análisis y Biometría (EN PROCESO)
 - [ ] **Mapa de Calor Anatómico**: Implementación visual de la recuperación muscular en el Dashboard.
 - [ ] **Gráficos de Evolución**: Integración de la librería Vico para volumen de carga y peso.
-- [ ] **Seguimiento Corporal**: Pantalla de ingreso de peso/parámetros con cálculo de IMC.
+- [x] **Seguimiento Corporal**: Pantalla de ingreso de peso/parámetros con cálculo de IMC.
 
 ---
 

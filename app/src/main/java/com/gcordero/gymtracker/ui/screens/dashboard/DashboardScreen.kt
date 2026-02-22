@@ -11,10 +11,13 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -23,9 +26,11 @@ import com.gcordero.gymtracker.ui.components.GlassCard
 import com.gcordero.gymtracker.ui.theme.Primary
 import com.gcordero.gymtracker.ui.theme.Secondary
 
+import com.gcordero.gymtracker.ui.navigation.Screen
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen() {
+fun DashboardScreen(navController: androidx.navigation.NavHostController) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -36,6 +41,18 @@ fun DashboardScreen() {
                         fontWeight = FontWeight.Bold,
                         color = Primary
                     )
+                },
+                actions = {
+                    val scope = androidx.compose.runtime.rememberCoroutineScope()
+                    val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+                    val userId = auth.currentUser?.uid ?: "test_user"
+                    TextButton(onClick = {
+                        scope.launch {
+                            com.gcordero.gymtracker.data.util.DataPopulator.populateInitialData(userId)
+                        }
+                    }) {
+                        Text("DEBUG", color = Color.Gray, fontSize = 10.sp)
+                    }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = Color.Transparent
@@ -63,13 +80,13 @@ fun DashboardScreen() {
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = { },
+                    onClick = { navController.navigate(Screen.Routines.route) },
                     icon = { Icon(Icons.Default.Star, contentDescription = null) },
                     label = { Text("Rutinas") }
                 )
                 NavigationBarItem(
                     selected = false,
-                    onClick = { },
+                    onClick = { navController.navigate(Screen.BodyMetrics.route) },
                     icon = { Icon(Icons.Default.Person, contentDescription = null) },
                     label = { Text("Perfil") }
                 )
@@ -85,7 +102,7 @@ fun DashboardScreen() {
         ) {
             item {
                 Text(
-                    "Hola, Guerrero 💪",
+                    "Hola, Gerson 💪",
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color.White
@@ -104,8 +121,7 @@ fun DashboardScreen() {
                             .height(180.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("Mapa de Calor (Próximamente)", color = Color.Gray)
-                        // This will be the anatomical SVG/Canvas view
+                        RecoveryHeatmap()
                     }
                 }
             }
@@ -134,7 +150,7 @@ fun DashboardScreen() {
             // Start Training Button
             item {
                 Button(
-                    onClick = { },
+                    onClick = { navController.navigate(Screen.Routines.route) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(56.dp),
@@ -181,6 +197,94 @@ fun StatCard(
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = color
+            )
+        }
+    }
+}
+
+@Composable
+fun RecoveryHeatmap() {
+    val muscleStatus = remember {
+        listOf(
+            "Pecho" to Color(0xFF00E676),
+            "Espalda" to Color(0xFFFFD600),
+            "Piernas" to Color(0xFFFF5252),
+            "Hombros" to Color(0xFF00E676),
+            "Brazos" to Color(0xFFFFD600)
+        )
+    }
+
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val centerX = size.width / 2
+        val bodyColor = Color.White.copy(alpha = 0.05f)
+        
+        // --- Dibujo de silueta humana decorativa ---
+        // Cabeza
+        drawCircle(
+            bodyColor,
+            radius = 12.dp.toPx(),
+            center = androidx.compose.ui.geometry.Offset(centerX, 25.dp.toPx())
+        )
+        
+        // Torso
+        val torsoOutline = androidx.compose.ui.graphics.Path().apply {
+            moveTo(centerX - 25.dp.toPx(), 40.dp.toPx())
+            lineTo(centerX + 25.dp.toPx(), 40.dp.toPx())
+            lineTo(centerX + 20.dp.toPx(), 110.dp.toPx())
+            lineTo(centerX - 20.dp.toPx(), 110.dp.toPx())
+            close()
+        }
+        drawPath(torsoOutline, bodyColor)
+        
+        // Brazos
+        drawRoundRect(
+            bodyColor,
+            topLeft = androidx.compose.ui.geometry.Offset(centerX - 55.dp.toPx(), 45.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size(20.dp.toPx(), 60.dp.toPx()),
+            cornerRadius = CornerRadius(10.dp.toPx())
+        )
+        drawRoundRect(
+            bodyColor,
+            topLeft = androidx.compose.ui.geometry.Offset(centerX + 35.dp.toPx(), 45.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size(20.dp.toPx(), 60.dp.toPx()),
+            cornerRadius = CornerRadius(10.dp.toPx())
+        )
+        
+        // Piernas
+        drawRoundRect(
+            bodyColor,
+            topLeft = androidx.compose.ui.geometry.Offset(centerX - 22.dp.toPx(), 115.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size(18.dp.toPx(), 60.dp.toPx()),
+            cornerRadius = CornerRadius(8.dp.toPx())
+        )
+        drawRoundRect(
+            bodyColor,
+            topLeft = androidx.compose.ui.geometry.Offset(centerX + 4.dp.toPx(), 115.dp.toPx()),
+            size = androidx.compose.ui.geometry.Size(18.dp.toPx(), 60.dp.toPx()),
+            cornerRadius = CornerRadius(8.dp.toPx())
+        )
+        
+        muscleStatus.forEach { pair ->
+            val muscle = pair.first
+            val color = pair.second
+            val offset = when(muscle) {
+                "Pecho" -> androidx.compose.ui.geometry.Offset(centerX, 60.dp.toPx())
+                "Hombros" -> androidx.compose.ui.geometry.Offset(centerX - 35.dp.toPx(), 55.dp.toPx())
+                "Brazos" -> androidx.compose.ui.geometry.Offset(centerX - 50.dp.toPx(), 90.dp.toPx())
+                "Piernas" -> androidx.compose.ui.geometry.Offset(centerX - 15.dp.toPx(), 140.dp.toPx())
+                "Espalda" -> androidx.compose.ui.geometry.Offset(centerX + 35.dp.toPx(), 55.dp.toPx())
+                else -> androidx.compose.ui.geometry.Offset(centerX, 60.dp.toPx())
+            }
+            
+            drawCircle(
+                color = color.copy(alpha = 0.3f),
+                radius = 15.dp.toPx(),
+                center = offset
+            )
+            drawCircle(
+                color = color,
+                radius = 6.dp.toPx(),
+                center = offset
             )
         }
     }

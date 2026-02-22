@@ -18,6 +18,7 @@ import com.gcordero.gymtracker.ui.theme.GlassBorder
 @Composable
 fun GlassCard(
     modifier: Modifier = Modifier,
+    padding: androidx.compose.ui.unit.Dp = 20.dp,
     onClick: (() -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
@@ -27,7 +28,7 @@ fun GlassCard(
             .background(Glass)
             .border(1.dp, GlassBorder, RoundedCornerShape(16.dp))
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .padding(20.dp)
+            .padding(padding)
     ) {
         content()
     }

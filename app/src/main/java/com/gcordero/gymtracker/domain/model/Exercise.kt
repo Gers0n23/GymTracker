@@ -6,6 +6,7 @@ data class Exercise(
     val name: String = "",
     val muscleGroup: String = "",
     val equipment: String = "",
+    val mediaUrl: String = "",
     val order: Int = 0,
     val notes: String = ""
 )

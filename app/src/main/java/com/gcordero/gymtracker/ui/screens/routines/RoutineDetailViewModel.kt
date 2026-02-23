@@ -56,13 +56,14 @@ class RoutineDetailViewModel(
         }
     }
 
-    fun addExercise(routineId: String, name: String, muscleGroup: String, mediaUrl: String = "") {
+    fun addExercise(routineId: String, name: String, muscleGroup: String, mediaUrl: String = "", targetSets: Int = 3) {
         val newExercise = Exercise(
             routineId = routineId,
             name = name,
             muscleGroup = muscleGroup,
             mediaUrl = mediaUrl,
-            order = _exercises.value.size
+            order = _exercises.value.size,
+            targetSets = targetSets
         )
         viewModelScope.launch {
             exerciseRepository.addExercise(newExercise)

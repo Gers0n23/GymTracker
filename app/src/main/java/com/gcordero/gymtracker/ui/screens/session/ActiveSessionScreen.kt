@@ -1,24 +1,29 @@
 package com.gcordero.gymtracker.ui.screens.session
 
+import android.content.Context
+import android.content.Intent
+import android.media.RingtoneManager
+import android.net.Uri
+import android.os.VibrationEffect
+import android.os.Vibrator
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -32,7 +37,6 @@ import com.gcordero.gymtracker.ui.theme.Glass
 import com.gcordero.gymtracker.ui.theme.GlassBorder
 import com.gcordero.gymtracker.ui.theme.Primary
 import com.gcordero.gymtracker.ui.theme.Secondary
-import coil.compose.AsyncImage
 
 @Composable
 fun TimerBadge(seconds: Int) {
@@ -71,10 +75,31 @@ fun ActiveSessionScreen(
     val routineName by viewModel.routineName.collectAsState()
     val isSessionSaved by viewModel.isSessionSaved.collectAsState()
     val restNextAction by viewModel.restNextAction.collectAsState()
+    val restMessage by viewModel.restMessage.collectAsState()
 
     val currentExercise = exercises.getOrNull(currentIndex)
     val currentExerciseSets = currentExercise?.let { sets[it.id] } ?: emptyList()
     val currentSet = currentExerciseSets.getOrNull(currentSetNum - 1)
+
+    // Vibración + sonido al terminar el descanso naturalmente
+    val context = LocalContext.current
+    LaunchedEffect(Unit) {
+        viewModel.restCompletedEvent.collect {
+            try {
+                @Suppress("DEPRECATION")
+                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                // Patrón tipo alarma: 5 pulsos largos a máxima amplitud
+                val timings = longArrayOf(0, 700, 200, 700, 200, 700, 200, 700, 200, 700)
+                val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255, 0, 255, 0, 255)
+                vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
+            } catch (_: Exception) {}
+            try {
+                val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                RingtoneManager.getRingtone(context, alarmUri)?.play()
+            } catch (_: Exception) {}
+        }
+    }
 
     LaunchedEffect(routineId) {
         viewModel.startSession(routineId)
@@ -158,7 +183,8 @@ fun ActiveSessionScreen(
                 }
 
                 if (currentExercise != null) {
-                    val totalSets = maxOf(currentExerciseSets.size, currentSetNum)
+                    val targetSets = currentExercise.targetSets.coerceAtLeast(1)
+                    val totalSets = maxOf(currentExerciseSets.size, currentSetNum, targetSets)
                     val previousSetRecord = currentExerciseSets.getOrNull(currentSetNum - 2)
                     val isLastExercise = currentIndex == exercises.size - 1
                     // Tarjeta principal ocupa todo el espacio restante
@@ -183,12 +209,16 @@ fun ActiveSessionScreen(
 
         // Rest Overlay
         if (isResting) {
+            val nextExercise = exercises.getOrNull(currentIndex + 1)
             RestOverlay(
                 secondsLeft = restTimer,
                 onSkip = { viewModel.skipRest() },
                 nextSetInfo = "Serie ${currentSetNum + 1} • ${currentSet?.weight ?: 0}kg",
                 restNextAction = restNextAction,
-                onToggleNextAction = { viewModel.setRestNextAction(it) }
+                onToggleNextAction = { viewModel.setRestNextAction(it) },
+                restMessage = restMessage,
+                nextExerciseName = nextExercise?.name ?: "",
+                nextExerciseMediaUrl = nextExercise?.mediaUrl ?: ""
             )
         }
     }
@@ -227,19 +257,15 @@ fun ExerciseSelectorPill(
             .padding(vertical = 10.dp, horizontal = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = name,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = textColor,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-            )
-            if (isDone) {
-                Text("✓", color = Secondary, fontWeight = FontWeight.ExtraBold, fontSize = 10.sp)
-            }
-        }
+        Text(
+            text = name,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            color = textColor,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
@@ -275,6 +301,10 @@ fun ActiveExerciseFocusCard(
     }
     var rir by remember(exercise.id, setNumber) { mutableStateOf(currentSetRecord?.rir ?: 2) }
 
+    val context = LocalContext.current
+    val targetSets = exercise.targetSets.coerceAtLeast(1)
+    val isLastTargetSet = setNumber >= targetSets
+
     GlassCard(
         modifier = modifier.fillMaxWidth(),
         padding = 0.dp
@@ -287,28 +317,66 @@ fun ActiveExerciseFocusCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header del ejercicio
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (exercise.equipment.isNotEmpty()) {
-                    Text(exercise.equipment.uppercase(), fontSize = 11.sp, color = Color.Gray, letterSpacing = 1.sp)
+            // Header: subtítulo (equipo – grupo muscular) + nombre + botón de video
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                val subtitle = buildList<String> {
+                    if (exercise.equipment.isNotEmpty()) add(exercise.equipment)
+                    if (exercise.muscleGroup.isNotEmpty()) add(exercise.muscleGroup)
+                }.joinToString(" – ")
+                if (subtitle.isNotEmpty()) {
+                    Text(subtitle.uppercase(), fontSize = 11.sp, color = Color.Gray, letterSpacing = 1.sp)
                 }
-                Text(
-                    exercise.name,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    textAlign = TextAlign.Center
-                )
+                // Nombre + botón YouTube-style
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        exercise.name,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.weight(1f)
+                    )
+                    if (exercise.mediaUrl.isNotEmpty()) {
+                        Spacer(Modifier.width(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(Color(0xFFFF0000))
+                                .clickable {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(exercise.mediaUrl))
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {}
+                                }
+                                .padding(horizontal = 8.dp, vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.PlayArrow,
+                                contentDescription = "Ver video del ejercicio",
+                                tint = Color.White,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
             }
 
+            // Badge de serie — resaltado si es la última serie objetivo
             Surface(
-                color = Primary,
+                color = if (isLastTargetSet) Color(0xFF4CAF50) else Primary,
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text(
-                    "SERIE $setNumber DE $totalSets",
+                    if (isLastTargetSet) "★  SERIE $setNumber DE $totalSets" else "SERIE $setNumber DE $totalSets",
                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
-                    color = Color.Black,
+                    color = if (isLastTargetSet) Color.White else Color.Black,
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp
                 )
@@ -499,14 +567,20 @@ fun RestOverlay(
     onSkip: () -> Unit,
     nextSetInfo: String,
     restNextAction: String = "serie",
-    onToggleNextAction: (String) -> Unit = {}
+    onToggleNextAction: (String) -> Unit = {},
+    restMessage: String = "",
+    nextExerciseName: String = "",
+    nextExerciseMediaUrl: String = ""
 ) {
+    val context = LocalContext.current
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Color(0xFF121212).copy(alpha = 0.98f)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -523,7 +597,33 @@ fun RestOverlay(
                 color = Primary
             )
 
-            Spacer(Modifier.height(32.dp))
+            // Mensaje motivacional / de estado
+            if (restMessage.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                val msgColor = when {
+                    restMessage.contains("Terminaste") -> Color(0xFF4CAF50)
+                    restMessage.contains("Falta") -> Color(0xFFFFD600)
+                    else -> Primary
+                }
+                GlassCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    padding = 14.dp,
+                    containerColor = msgColor.copy(alpha = 0.1f),
+                    borderColor = msgColor.copy(alpha = 0.4f)
+                ) {
+                    Text(
+                        restMessage,
+                        color = msgColor,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+                Spacer(Modifier.height(16.dp))
+            } else {
+                Spacer(Modifier.height(32.dp))
+            }
 
             // Toggle: ¿Qué hacemos al terminar el descanso?
             GlassCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
@@ -595,7 +695,58 @@ fun RestOverlay(
                 }
             }
 
-            Spacer(Modifier.height(48.dp))
+            // Preview del siguiente ejercicio (solo visible cuando el toggle es "ejercicio")
+            if (restNextAction == "ejercicio" && nextExerciseName.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                GlassCard(modifier = Modifier.fillMaxWidth(), padding = 12.dp) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "SIGUIENTE EJERCICIO",
+                                fontSize = 10.sp,
+                                color = Color(0xFF3D8EFF),
+                                letterSpacing = 1.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                nextExerciseName,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                        if (nextExerciseMediaUrl.isNotEmpty()) {
+                            Spacer(Modifier.width(12.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFFF0000))
+                                    .clickable {
+                                        try {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(nextExerciseMediaUrl))
+                                            context.startActivity(intent)
+                                        } catch (_: Exception) {}
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 7.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = "Ver video del siguiente ejercicio",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
 
             TextButton(onClick = onSkip) {
                 Text(

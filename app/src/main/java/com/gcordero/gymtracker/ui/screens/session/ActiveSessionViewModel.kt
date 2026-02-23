@@ -1,6 +1,13 @@
 package com.gcordero.gymtracker.ui.screens.session
 
-import androidx.lifecycle.ViewModel
+import android.app.AlarmManager
+import android.app.Application
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.os.SystemClock
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gcordero.gymtracker.data.repository.ExerciseRepository
 import com.gcordero.gymtracker.data.repository.RoutineRepository
@@ -13,17 +20,23 @@ import com.google.firebase.Timestamp
 import com.gcordero.gymtracker.ui.navigation.SessionHolder
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class ActiveSessionViewModel(
+    application: Application,
     private val exerciseRepository: ExerciseRepository = ExerciseRepository(),
     private val workoutRepository: WorkoutRepository = WorkoutRepository(),
     private val routineRepository: RoutineRepository = RoutineRepository(),
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
-) : ViewModel() {
+) : AndroidViewModel(application) {
+
+    private val alarmManager = application.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
     private val _exercises = MutableStateFlow<List<Exercise>>(emptyList())
     val exercises: StateFlow<List<Exercise>> = _exercises.asStateFlow()
@@ -58,6 +71,23 @@ class ActiveSessionViewModel(
     // Controla qué pasa al terminar el descanso: "serie" = otra serie, "ejercicio" = siguiente ejercicio
     private val _restNextAction = MutableStateFlow("serie")
     val restNextAction: StateFlow<String> = _restNextAction.asStateFlow()
+
+    // Mensaje motivacional / estado en la pantalla de descanso
+    private val _restMessage = MutableStateFlow("")
+    val restMessage: StateFlow<String> = _restMessage.asStateFlow()
+
+    // Evento que se emite cuando el descanso termina naturalmente (para vibración/sonido)
+    private val _restCompletedEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val restCompletedEvent: SharedFlow<Unit> = _restCompletedEvent.asSharedFlow()
+
+    private val motivationalMessages = listOf(
+        "¡Extraordinario! 💥",
+        "¡Sigue así, crack! 🔥",
+        "¡Gran serie! 💪",
+        "¡Imparable! ⚡",
+        "¡Eso es! 🎯",
+        "¡Brutal! 🏆"
+    )
 
     fun setRestNextAction(action: String) {
         _restNextAction.value = action
@@ -112,25 +142,68 @@ class ActiveSessionViewModel(
         }
     }
 
+    private fun getRestAlarmPendingIntent(): PendingIntent {
+        val intent = Intent(getApplication(), RestTimerReceiver::class.java)
+        return PendingIntent.getBroadcast(
+            getApplication(),
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun scheduleRestAlarm(delaySeconds: Int) {
+        val triggerAt = SystemClock.elapsedRealtime() + delaySeconds * 1000L
+        val pendingIntent = getRestAlarmPendingIntent()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pendingIntent)
+        } else {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerAt, pendingIntent)
+        }
+    }
+
+    private fun cancelRestAlarm() {
+        alarmManager.cancel(getRestAlarmPendingIntent())
+    }
+
     fun startRestTimer() {
         restTimerJob?.cancel()
         _restTimerSeconds.value = 90 // Default 90s rest
         _isResting.value = true
+
+        // Determinar mensaje motivacional según progreso vs series objetivo
+        val exercise = _exercises.value.getOrNull(_currentExerciseIndex.value)
+        val completedSetNum = _currentSetNumber.value
+        val targetSets = (exercise?.targetSets ?: 3).coerceAtLeast(1)
+
+        val message = when {
+            completedSetNum >= targetSets -> {
+                _restNextAction.value = "ejercicio" // auto-switch al terminar el objetivo
+                "¡Terminaste! ¡Bien hecho! 🎉"
+            }
+            completedSetNum == targetSets - 1 -> "¡Falta solo 1 serie más! 💪"
+            else -> motivationalMessages[(completedSetNum - 1).coerceAtLeast(0) % motivationalMessages.size]
+        }
+        _restMessage.value = message
+
         restTimerJob = viewModelScope.launch {
             while (_restTimerSeconds.value > 0) {
                 delay(1000)
                 _restTimerSeconds.value -= 1
             }
-            onRestComplete()
+            onRestComplete(skipped = false)
         }
     }
 
     fun skipRest() {
         restTimerJob?.cancel()
-        onRestComplete()
+        onRestComplete(skipped = true)
     }
 
-    private fun onRestComplete() {
+    private fun onRestComplete(skipped: Boolean = false) {
+        if (!skipped) {
+            _restCompletedEvent.tryEmit(Unit)
+        }
         _isResting.value = false
         _restTimerSeconds.value = 0
 

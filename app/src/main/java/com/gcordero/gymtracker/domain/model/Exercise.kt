@@ -8,5 +8,6 @@ data class Exercise(
     val equipment: String = "",
     val mediaUrl: String = "",
     val order: Int = 0,
-    val notes: String = ""
+    val notes: String = "",
+    val targetSets: Int = 3
 )

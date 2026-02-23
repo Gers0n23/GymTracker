@@ -193,8 +193,8 @@ fun RoutineDetailScreen(
     if (showAddExerciseDialog) {
         AddExerciseDialog(
             onDismiss = { showAddExerciseDialog = false },
-            onConfirm = { name, muscle, media ->
-                viewModel.addExercise(routineId, name, muscle, media)
+            onConfirm = { name, muscle, media, targetSets ->
+                viewModel.addExercise(routineId, name, muscle, media, targetSets)
                 showAddExerciseDialog = false
             }
         )
@@ -400,11 +400,12 @@ private fun getYoutubeVideoId(url: String): String? {
 @Composable
 private fun AddExerciseDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, String, String) -> Unit
+    onConfirm: (String, String, String, Int) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var muscle by remember { mutableStateOf("") }
     var mediaUrl by remember { mutableStateOf("") }
+    var targetSets by remember { mutableIntStateOf(3) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -433,11 +434,40 @@ private fun AddExerciseDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Primary, focusedLabelColor = Primary)
                 )
+                // Series objetivo picker
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Series objetivo", fontSize = 14.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { if (targetSets > 1) targetSets-- },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Text("−", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            "$targetSets",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.width(32.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        IconButton(
+                            onClick = { if (targetSets < 8) targetSets++ },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Más series")
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
-                onClick = { if (name.isNotBlank()) onConfirm(name, muscle, mediaUrl) },
+                onClick = { if (name.isNotBlank()) onConfirm(name, muscle, mediaUrl, targetSets) },
                 colors = ButtonDefaults.buttonColors(containerColor = Primary)
             ) {
                 Text("Añadir", color = Color.Black)
@@ -509,6 +539,7 @@ private fun EditExerciseDialog(
     var muscle by remember { mutableStateOf(exercise.muscleGroup) }
     var notes by remember { mutableStateOf(exercise.notes) }
     var mediaUrl by remember { mutableStateOf(exercise.mediaUrl) }
+    var targetSets by remember { mutableIntStateOf(exercise.targetSets.coerceAtLeast(1)) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -543,13 +574,42 @@ private fun EditExerciseDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Primary, focusedLabelColor = Primary)
                 )
+                // Series objetivo picker
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Series objetivo", fontSize = 14.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = { if (targetSets > 1) targetSets-- },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Text("−", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Text(
+                            "$targetSets",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.width(32.dp),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                        )
+                        IconButton(
+                            onClick = { if (targetSets < 8) targetSets++ },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = "Más series")
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             Button(
                 onClick = {
                     if (name.isNotBlank()) {
-                        onConfirm(exercise.copy(name = name, muscleGroup = muscle, notes = notes, mediaUrl = mediaUrl))
+                        onConfirm(exercise.copy(name = name, muscleGroup = muscle, notes = notes, mediaUrl = mediaUrl, targetSets = targetSets))
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Primary)

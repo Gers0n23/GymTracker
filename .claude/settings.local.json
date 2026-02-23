@@ -5,7 +5,9 @@
       "Bash(cmd /c \"gradlew.bat compileDebugKotlin 2>&1\")",
       "Bash(cmd /c:*)",
       "Bash(./gradlew.bat compileDebugKotlin:*)",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(./gradlew assembleDebug:*)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew:*)"
     ]
   }
 }

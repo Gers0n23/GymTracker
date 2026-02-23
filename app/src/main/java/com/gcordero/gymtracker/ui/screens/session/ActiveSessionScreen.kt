@@ -1,11 +1,11 @@
 package com.gcordero.gymtracker.ui.screens.session
 
-import android.content.Context
+import android.Manifest
 import android.content.Intent
-import android.media.RingtoneManager
 import android.net.Uri
-import android.os.VibrationEffect
-import android.os.Vibrator
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -63,7 +63,7 @@ fun TimerBadge(seconds: Int) {
 fun ActiveSessionScreen(
     routineId: String,
     onFinish: () -> Unit,
-    viewModel: ActiveSessionViewModel = viewModel()
+    viewModel: ActiveSessionViewModel = viewModel(factory = ActiveSessionViewModel.Factory)
 ) {
     val exercises by viewModel.exercises.collectAsState()
     val sets by viewModel.sets.collectAsState()
@@ -81,25 +81,18 @@ fun ActiveSessionScreen(
     val currentExerciseSets = currentExercise?.let { sets[it.id] } ?: emptyList()
     val currentSet = currentExerciseSets.getOrNull(currentSetNum - 1)
 
-    // Vibración + sonido al terminar el descanso naturalmente
-    val context = LocalContext.current
+    // Solicitar permiso de notificaciones (Android 13+)
+    val notifPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* no action needed — notification will fire if granted */ }
     LaunchedEffect(Unit) {
-        viewModel.restCompletedEvent.collect {
-            try {
-                @Suppress("DEPRECATION")
-                val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-                // Patrón tipo alarma: 5 pulsos largos a máxima amplitud
-                val timings = longArrayOf(0, 700, 200, 700, 200, 700, 200, 700, 200, 700)
-                val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255, 0, 255, 0, 255)
-                vibrator.vibrate(VibrationEffect.createWaveform(timings, amplitudes, -1))
-            } catch (_: Exception) {}
-            try {
-                val alarmUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-                    ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
-                RingtoneManager.getRingtone(context, alarmUri)?.play()
-            } catch (_: Exception) {}
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
+
+    // La vibración y notificación se manejan directamente desde el ViewModel (funciona en background)
+    // El LaunchedEffect ya no es necesario para esto.
 
     LaunchedEffect(routineId) {
         viewModel.startSession(routineId)

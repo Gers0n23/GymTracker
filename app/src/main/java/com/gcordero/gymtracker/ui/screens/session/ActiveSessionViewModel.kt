@@ -8,7 +8,10 @@ import android.content.Intent
 import android.os.Build
 import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import com.gcordero.gymtracker.data.repository.ExerciseRepository
 import com.gcordero.gymtracker.data.repository.RoutineRepository
 import com.gcordero.gymtracker.data.repository.WorkoutRepository
@@ -186,6 +189,9 @@ class ActiveSessionViewModel(
         }
         _restMessage.value = message
 
+        // Schedule background alarm 2s after timer ends (fires if app is backgrounded)
+        scheduleRestAlarm(_restTimerSeconds.value + 2)
+
         restTimerJob = viewModelScope.launch {
             while (_restTimerSeconds.value > 0) {
                 delay(1000)
@@ -197,13 +203,20 @@ class ActiveSessionViewModel(
 
     fun skipRest() {
         restTimerJob?.cancel()
+        cancelRestAlarm()
         onRestComplete(skipped = true)
     }
 
     private fun onRestComplete(skipped: Boolean = false) {
         if (!skipped) {
-            _restCompletedEvent.tryEmit(Unit)
+            val app = getApplication<Application>()
+            // Vibrar y notificar directamente desde el ViewModel:
+            // Esto funciona tanto en foreground como en background ligero (coroutine sigue corriendo).
+            // El BroadcastReceiver solo actúa en Doze profundo (cuando el proceso está suspendido).
+            RestTimerReceiver.vibrate(app)
+            RestTimerReceiver.showNotification(app)
         }
+        cancelRestAlarm() // Cancelar la alarma de respaldo después de haberla manejado aquí
         _isResting.value = false
         _restTimerSeconds.value = 0
 
@@ -272,6 +285,16 @@ class ActiveSessionViewModel(
             )
             currentSets[exerciseId] = exerciseSets
             _sets.value = currentSets
+        }
+    }
+
+    companion object {
+        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
+                return ActiveSessionViewModel(application) as T
+            }
         }
     }
 

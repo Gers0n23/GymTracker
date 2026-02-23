@@ -72,6 +72,14 @@ class WorkoutRepository(
         sessionsCollection.document(session.id).set(session).await()
     }
 
+    suspend fun deleteSession(sessionId: String) {
+        val batch = firestore.batch()
+        batch.delete(sessionsCollection.document(sessionId))
+        val sets = setRecordsCollection.whereEqualTo("sessionId", sessionId).get().await()
+        sets.documents.forEach { batch.delete(it.reference) }
+        batch.commit().await()
+    }
+
     /**
      * Devuelve los sets de la sesión anterior (distinta de currentSessionId) para la misma rutina.
      * Usado para mostrar la comparativa en el detalle de sesión.

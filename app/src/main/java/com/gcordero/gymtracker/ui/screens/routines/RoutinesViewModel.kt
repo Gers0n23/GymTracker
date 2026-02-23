@@ -47,4 +47,16 @@ class RoutinesViewModel(
             repository.addRoutine(newRoutine)
         }
     }
+
+    fun updateRoutine(routine: Routine) {
+        viewModelScope.launch {
+            repository.updateRoutine(routine)
+        }
+    }
+
+    fun deleteRoutine(routineId: String) {
+        viewModelScope.launch {
+            repository.deleteRoutine(routineId)
+        }
+    }
 }

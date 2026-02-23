@@ -7,6 +7,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -26,12 +27,17 @@ import com.gcordero.gymtracker.ui.components.GlassCard
 import com.gcordero.gymtracker.ui.theme.Primary
 import com.gcordero.gymtracker.ui.theme.Secondary
 
+import android.util.Log
 import com.gcordero.gymtracker.ui.navigation.Screen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(navController: androidx.navigation.NavHostController) {
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -43,12 +49,19 @@ fun DashboardScreen(navController: androidx.navigation.NavHostController) {
                     )
                 },
                 actions = {
-                    val scope = androidx.compose.runtime.rememberCoroutineScope()
                     val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
                     val userId = auth.currentUser?.uid ?: "test_user"
+                    
                     TextButton(onClick = {
                         scope.launch {
-                            com.gcordero.gymtracker.data.util.DataPopulator.populateInitialData(userId)
+                            snackbarHostState.showSnackbar("Conectando con Firestore...")
+                            val result = com.gcordero.gymtracker.data.util.DataPopulator.populateInitialData(userId)
+                            if (result.isSuccess) {
+                                snackbarHostState.showSnackbar("¡Base de Datos Poblada con Éxito!")
+                            } else {
+                                val error = result.exceptionOrNull()
+                                snackbarHostState.showSnackbar("Error: ${error?.localizedMessage ?: "Fallo desconocido"}")
+                            }
                         }
                     }) {
                         Text("DEBUG", color = Color.Gray, fontSize = 10.sp)
@@ -86,9 +99,29 @@ fun DashboardScreen(navController: androidx.navigation.NavHostController) {
                 )
                 NavigationBarItem(
                     selected = false,
+                    onClick = { navController.navigate(Screen.WorkoutHistory.route) },
+                    icon = { Icon(Icons.Default.List, contentDescription = null) },
+                    label = { Text("Historial") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Primary,
+                        selectedTextColor = Primary,
+                        unselectedIconColor = Color.Gray,
+                        unselectedTextColor = Color.Gray,
+                        indicatorColor = Color.Transparent
+                    )
+                )
+                NavigationBarItem(
+                    selected = false,
                     onClick = { navController.navigate(Screen.BodyMetrics.route) },
                     icon = { Icon(Icons.Default.Person, contentDescription = null) },
-                    label = { Text("Perfil") }
+                    label = { Text("Perfil") },
+                    colors = NavigationBarItemDefaults.colors(
+                        selectedIconColor = Primary,
+                        selectedTextColor = Primary,
+                        unselectedIconColor = Color.Gray,
+                        unselectedTextColor = Color.Gray,
+                        indicatorColor = Color.Transparent
+                    )
                 )
             }
         }

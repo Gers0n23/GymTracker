@@ -8,6 +8,29 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <style>
+        :root {
+            --timer-bg: rgba(187, 134, 252, 0.1);
+        }
+
+        body {
+            overflow: hidden;
+            /* Prevent scrolling if possible to feel more like an app */
+        }
+
+        .app-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
         .timer-badge {
             background: var(--primary-variant);
             padding: 8px 16px;
@@ -18,142 +41,563 @@
             gap: 8px;
         }
 
-        .exercise-item {
-            border-left: 4px solid var(--primary);
-            padding-left: 15px;
+        .main-content {
+            flex-grow: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 20px;
+        }
+
+        /* Integrated Exercise Selector */
+        .exercise-selector-container {
+            background: var(--surface);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 12px;
+            margin-bottom: 5px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .exercise-selector {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            scrollbar-width: none;
+            padding: 2px;
+        }
+
+        .exercise-selector::-webkit-scrollbar {
+            display: none;
+        }
+
+        .selector-item {
+            flex-shrink: 0;
+            min-width: 85px;
+            padding: 10px 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            cursor: pointer;
+            color: rgba(255, 255, 255, 0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .selector-item.active {
+            border-color: var(--primary);
+            background: rgba(187, 134, 252, 0.1);
+            color: white;
+            box-shadow: 0 0 10px rgba(187, 134, 252, 0.15);
+        }
+
+        .selector-item.done {
+            border-color: rgba(3, 218, 198, 0.3);
+            background: rgba(3, 218, 198, 0.05);
+            color: rgba(3, 218, 198, 0.6);
+            opacity: 0.8;
+        }
+
+        .selector-item .status-icon {
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .selector-item.done::after {
+            content: '✓';
+            position: absolute;
+            top: 4px;
+            right: 6px;
+            color: var(--secondary);
+            font-weight: 800;
+            font-size: 10px;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+                opacity: 1;
+            }
+
+            50% {
+                transform: scale(1.05);
+                opacity: 0.8;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .pulse {
+            animation: pulse 2s infinite ease-in-out;
+        }
+
+        /* Active Exercise Card */
+        .active-card {
+            background: var(--surface);
+            border-radius: 24px;
+            padding: 25px;
+            border: 1px solid var(--glass-border);
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            position: relative;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }
+
+        .exercise-header {
+            text-align: center;
             margin-bottom: 30px;
         }
 
-        .set-row {
-            display: grid;
-            grid-template-columns: 40px 1fr 1fr 50px;
-            gap: 10px;
-            align-items: center;
-            margin-top: 10px;
-            background: var(--glass);
-            padding: 10px;
-            border-radius: 8px;
+        .exercise-type {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.5;
+            margin-bottom: 4px;
         }
 
-        .input-mini {
-            background: transparent;
-            border: 1px solid var(--glass-border);
-            color: white;
-            padding: 5px;
-            border-radius: 4px;
-            width: 100%;
+        .set-indicator {
+            background: var(--primary);
+            color: black;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 12px;
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+
+        /* Large Inputs */
+        .focused-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .input-group {
             text-align: center;
         }
 
-        .check-circle {
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            border: 2px solid var(--primary);
+        .input-group label {
+            display: block;
+            font-size: 12px;
+            opacity: 0.6;
+            margin-bottom: 8px;
+        }
+
+        .large-input {
+            background: var(--glass);
+            border: 2px solid var(--glass-border);
+            border-radius: 16px;
+            width: 100%;
+            height: 80px;
+            font-size: 32px;
+            font-weight: 700;
+            color: white;
+            text-align: center;
+            transition: border-color 0.3s ease;
+        }
+
+        .large-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* RIR Selector - Simplified */
+        .rir-focus {
+            margin-bottom: 30px;
+        }
+
+        .rir-buttons {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .rir-btn {
+            flex: 1;
+            padding: 12px 0;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
             cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .check-circle.done {
+        .rir-btn.selected {
             background: var(--primary);
-            position: relative;
+            color: black;
+            border-color: var(--primary);
         }
 
-        .check-circle.done::after {
-            content: '✓';
-            color: black;
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+        /* Modal Rest Timer */
+        #rest-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(18, 18, 18, 0.98);
+            backdrop-filter: blur(20px);
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 40px;
+            animation: fadeInOverlay 0.5s ease;
+        }
+
+        @keyframes fadeInOverlay {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .rest-timer-display {
+            font-size: 96px;
+            font-weight: 800;
+            color: var(--primary);
+            margin: 20px 0;
+            text-shadow: 0 0 30px rgba(187, 134, 252, 0.4);
+        }
+
+        .rest-label {
+            font-size: 20px;
+            opacity: 0.7;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .skip-btn {
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.3);
+            text-decoration: underline;
+            margin-top: 40px;
+            cursor: pointer;
             font-size: 14px;
+        }
+
+        .skip-btn:hover {
+            color: white;
+        }
+
+        .pr-alert {
+            position: absolute;
+            top: -20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+
+        /* Vibration Animation */
+        @keyframes vibrate {
+            0% {
+                transform: translate(0, 0);
+            }
+
+            10% {
+                transform: translate(-5px, 0);
+            }
+
+            20% {
+                transform: translate(5px, 0);
+            }
+
+            30% {
+                transform: translate(-5px, 0);
+            }
+
+            40% {
+                transform: translate(5px, 0);
+            }
+
+            50% {
+                transform: translate(-5px, 0);
+            }
+
+            60% {
+                transform: translate(5px, 0);
+            }
+
+            70% {
+                transform: translate(-5px, 0);
+            }
+
+            80% {
+                transform: translate(5px, 0);
+            }
+
+            90% {
+                transform: translate(-5px, 0);
+            }
+
+            100% {
+                transform: translate(0, 0);
+            }
+        }
+
+        .vibrating {
+            animation: vibrate 0.5s infinite;
+        }
+
+        .next-set-preview {
+            margin-top: 20px;
+            padding: 15px;
+            background: var(--glass);
+            border-radius: 12px;
+            width: 100%;
+            text-align: center;
         }
     </style>
 </head>
 
 <body>
     <div class="app-container">
-        <header style="display: flex; justify-content: space-between; align-items: center;">
+        <header>
             <div>
-                <p style="font-size: 12px; opacity: 0.7;">Sesión en curso</p>
-                <h1>Empuje + Pecho</h1>
+                <p style="font-size: 10px; opacity: 0.5;">Empuje + Pecho</p>
+                <h1 style="font-size: 20px;">Sesión Activa</h1>
             </div>
-            <div class="timer-badge">
-                <span>⏱️</span>
-                <span>00:42:15</span>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="timer-badge">
+                    <span>⏱️</span>
+                    <span id="global-timer">00:42:15</span>
+                </div>
+                <button class="btn btn-primary"
+                    style="padding: 8px 12px; font-size: 11px; background: var(--error); color: white;"
+                    onclick="finishSession()">FINALIZAR</button>
             </div>
         </header>
 
-        <section style="padding: 20px;">
-            <div class="exercise-item animate" style="animation-delay: 0.1s;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
-                    <div>
-                        <h3 style="font-size: 18px;">Press de Banca</h3>
-                        <p style="font-size: 12px; opacity: 0.6;">Máquina / Barra</p>
+        <div class="main-content">
+            <!-- Exercise Selector (Integrated Card) -->
+            <div class="exercise-selector-container animate">
+                <div class="exercise-selector">
+                    <div class="selector-item done">
+                        <span class="status-icon">💪</span>
+                        <span>Press Banca</span>
                     </div>
-                    <button class="btn-ghost" style="padding: 4px 8px; font-size: 10px;">HISTORIAL</button>
-                </div>
-
-                <div class="set-row">
-                    <span style="opacity: 0.5;">1</span>
-                    <input type="number" class="input-mini" value="80" placeholder="kg">
-                    <input type="number" class="input-mini" value="8" placeholder="reps">
-                    <div class="check-circle done"></div>
-                    <div style="grid-column: 1 / span 4;">
-                        <p style="font-size: 8px; opacity: 0.5; margin-bottom: 3px;">Reps in Reserve (RIR)</p>
-                        <div class="rir-container">
-                            <div class="rir-chip">0</div>
-                            <div class="rir-chip">1</div>
-                            <div class="rir-chip selected">2</div>
-                            <div class="rir-chip">3</div>
-                            <div class="rir-chip">4+</div>
-                        </div>
+                    <div class="selector-item active" id="current-ex-pill">
+                        <span class="status-icon">🦋</span>
+                        <span>Aperturas</span>
                     </div>
-                </div>
-
-                <div class="set-row" style="border: 1px solid #ffd700;">
-                    <span style="opacity: 0.5;">2</span>
-                    <input type="number" class="input-mini" value="85" style="color: #ffd700;">
-                    <input type="number" class="input-mini" value="8">
-                    <div class="check-circle done"></div>
-                    <div
-                        style="grid-column: 1 / span 4; display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
-                        <span class="pr-badge">¡NUEVO PR! 🏆</span>
-                        <span style="font-size: 9px; opacity: 0.5;">RIR 1</span>
+                    <div class="selector-item">
+                        <span class="status-icon">🏋️</span>
+                        <span>Press Militar</span>
+                    </div>
+                    <div class="selector-item">
+                        <span class="status-icon">📐</span>
+                        <span>Laterales</span>
+                    </div>
+                    <div class="selector-item">
+                        <span class="status-icon">🦾</span>
+                        <span>Triceps</span>
                     </div>
                 </div>
-                <div class="set-row">
-                    <span style="opacity: 0.5;">3</span>
-                    <input type="number" class="input-mini" value="80" placeholder="kg">
-                    <input type="number" class="input-mini" value="" placeholder="reps">
-                    <div class="check-circle"></div>
-                </div>
-
-                <button class="btn btn-ghost" style="width: 100%; margin-top: 10px; font-size: 12px;">+ AGREGAR
-                    SERIE</button>
             </div>
 
-            <div class="exercise-item animate" style="animation-delay: 0.2s; opacity: 0.5;">
-                <h3 style="font-size: 18px;">Aperturas en Contratractor</h3>
-                <p style="font-size: 12px; opacity: 0.6;">Máquina</p>
-                <div style="padding-top: 10px;">Esperando...</div>
-            </div>
-        </section>
+            <!-- Active Exercise Card -->
+            <div class="active-card animate">
+                <div class="exercise-header">
+                    <span class="exercise-type">MÁQUINA / CONTRATRACTOR</span>
+                    <h2 id="exercise-name" style="font-size: 24px; margin-top: 5px;">Aperturas en Contratractor</h2>
+                </div>
 
-        <div style="padding: 0 20px 20px 20px;" class="animate" style="animation-delay: 0.3s;">
-            <div class="card" style="margin: 0; background: var(--primary-variant); color: white;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Descanso: <b>01:15</b></span>
-                    <button class="btn btn-primary"
-                        style="background: white; color: var(--primary-variant); padding: 5px 15px;">SALTAR</button>
+                <div style="text-align: center;">
+                    <div class="set-indicator">SERIE <span id="set-num">1</span> DE 3</div>
+                </div>
+
+                <div class="focused-inputs">
+                    <div class="input-group">
+                        <label>PESO (kg)</label>
+                        <input type="number" class="large-input" value="45" id="input-weight">
+                    </div>
+                    <div class="input-group">
+                        <label>REPETICIONES</label>
+                        <input type="number" class="large-input" value="12" id="input-reps">
+                    </div>
+                </div>
+
+                <div class="rir-focus">
+                    <label
+                        style="display: block; font-size: 12px; opacity: 0.6; margin-bottom: 10px; text-align: center;">RIR
+                        (Esfuerzo sobrante)</label>
+                    <div class="rir-buttons">
+                        <button class="rir-btn" onclick="selectRir(0)">0</button>
+                        <button class="rir-btn" onclick="selectRir(1)">1</button>
+                        <button class="rir-btn selected" onclick="selectRir(2)">2</button>
+                        <button class="rir-btn" onclick="selectRir(3)">3</button>
+                        <button class="rir-btn" onclick="selectRir('4+')">4+</button>
+                    </div>
+                </div>
+
+                <button class="btn btn-primary"
+                    style="height: 65px; font-size: 18px; border-radius: 20px; box-shadow: 0 4px 15px rgba(187,134,252,0.3);"
+                    onclick="finishSet()">
+                    LISTO - INICIAR DESCANSO
+                </button>
+
+                <div style="display: flex; justify-content: center; margin-top: 20px;">
+                    <button class="btn btn-ghost" style="border: none; opacity: 0.5; font-size: 12px;"
+                        onclick="nextExercise()">TERMINAR EJERCICIO</button>
                 </div>
             </div>
         </div>
 
-        <div style="padding: 0 20px;">
-            <button class="btn btn-primary" style="width: 100%;" onclick="location.href='dashboard.html'">FINALIZAR
-                SESIÓN</button>
+        <!-- Rest Overlay -->
+        <div id="rest-overlay">
+            <div class="rest-label">Descansando</div>
+            <div class="rest-timer-display pulse" id="countdown">01:30</div>
+            <div class="next-set-preview">
+                <p style="font-size: 12px; opacity: 0.5;">PRÓXIMA SERIE</p>
+                <b id="next-set-info">Serie 2 • 45kg • 12 reps</b>
+            </div>
+            <button class="skip-btn" onclick="skipRest()">Saltar descanso (sutil)</button>
         </div>
     </div>
+
+    <script>
+        let currentSet = 1;
+        const totalSets = 3;
+        let restTime = 90;
+        let timerInterval;
+
+        function selectRir(val) {
+            document.querySelectorAll('.rir-btn').forEach(btn => {
+                btn.classList.toggle('selected', btn.innerText == val);
+            });
+        }
+
+        function finishSet() {
+            // Show rest overlay
+            document.getElementById('rest-overlay').style.display = 'flex';
+            startRestTimer();
+        }
+
+        function startRestTimer() {
+            let timeLeft = restTime;
+            updateTimerDisplay(timeLeft);
+
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay(timeLeft);
+                if (timeLeft <= 0) {
+                    endRest();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            document.getElementById('countdown').innerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        function endRest() {
+            clearInterval(timerInterval);
+
+            // Simulation of Vibration
+            const overlay = document.getElementById('rest-overlay');
+            overlay.classList.add('vibrating');
+
+            setTimeout(() => {
+                overlay.classList.remove('vibrating');
+                overlay.style.display = 'none';
+
+                // Advance set
+                if (currentSet < totalSets) {
+                    currentSet++;
+                    document.getElementById('set-num').innerText = currentSet;
+                    document.getElementById('next-set-info').innerText = `Serie ${currentSet + 1} • 45kg • 12 reps`;
+                    if (currentSet === totalSets) {
+                        document.getElementById('next-set-info').innerText = "¡Última serie!";
+                    }
+                } else {
+                    nextExercise();
+                }
+            }, 1500); // 1.5s of "vibration" before closing
+        }
+
+        function skipRest() {
+            endRest();
+        }
+
+        function nextExercise() {
+            const currentPill = document.getElementById('current-ex-pill');
+            if (currentPill) {
+                currentPill.classList.remove('active');
+                currentPill.classList.add('done');
+                currentPill.id = ''; // Remove ID to find the next "active" candidate
+            }
+
+            // Find next sibling to simulate move
+            const selectorItems = document.querySelectorAll('.selector-item');
+            let foundNext = false;
+            for (let i = 0; i < selectorItems.length; i++) {
+                if (selectorItems[i].classList.contains('done') && !selectorItems[i + 1]?.classList.contains('done')) {
+                    if (selectorItems[i + 1]) {
+                        selectorItems[i + 1].classList.add('active');
+                        selectorItems[i + 1].id = 'current-ex-pill';
+                        document.getElementById('exercise-name').innerText = selectorItems[i + 1].querySelector('span:last-child').innerText;
+
+                        // Reset exercise card state
+                        currentSet = 1;
+                        document.getElementById('set-num').innerText = currentSet;
+                        document.getElementById('next-set-info').innerText = `Serie 2 • 45kg • 12 reps`;
+
+                        foundNext = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!foundNext) {
+                if (confirm("Has completado todos los ejercicios. ¿Deseas finalizar la sesión?")) {
+                    finishSession();
+                }
+            }
+        }
+
+        function finishSession() {
+            location.href = 'session_summary.html';
+        }
+
+        // Global timer simulation
+        let globalSeconds = 2535; // 42:15
+        setInterval(() => {
+            globalSeconds++;
+            const h = Math.floor(globalSeconds / 3600);
+            const m = Math.floor((globalSeconds % 3600) / 60);
+            const s = globalSeconds % 60;
+            document.getElementById('global-timer').innerText =
+                `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }, 1000);
+    </script>
 </body>
 
 </html>

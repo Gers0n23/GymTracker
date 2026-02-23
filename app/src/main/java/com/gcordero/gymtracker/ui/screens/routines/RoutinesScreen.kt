@@ -4,8 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +27,8 @@ fun RoutinesScreen(
     val routines by viewModel.routines.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
+    var routineToEdit by remember { mutableStateOf<Routine?>(null) }
+    var routineToDelete by remember { mutableStateOf<Routine?>(null) }
 
     Scaffold(
         topBar = {
@@ -80,7 +81,9 @@ fun RoutinesScreen(
                     items(routines) { routine ->
                         RoutineItem(
                             routine = routine,
-                            onClick = { onRoutineClick(routine.id) }
+                            onClick = { onRoutineClick(routine.id) },
+                            onEdit = { routineToEdit = it },
+                            onDelete = { routineToDelete = it }
                         )
                     }
                 }
@@ -97,13 +100,51 @@ fun RoutinesScreen(
             }
         )
     }
+
+    if (routineToEdit != null) {
+        EditRoutineDialog(
+            routine = routineToEdit!!,
+            onDismiss = { routineToEdit = null },
+            onConfirm = { updatedRoutine ->
+                viewModel.updateRoutine(updatedRoutine)
+                routineToEdit = null
+            }
+        )
+    }
+
+    if (routineToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { routineToDelete = null },
+            title = { Text("¿Eliminar Rutina?") },
+            text = { Text("¿Estás seguro de que quieres eliminar '${routineToDelete?.name}'? Esta acción no se puede deshacer.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteRoutine(routineToDelete!!.id)
+                        routineToDelete = null
+                    }
+                ) {
+                    Text("Eliminar", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { routineToDelete = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 }
 
 @Composable
 fun RoutineItem(
     routine: Routine,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onEdit: (Routine) -> Unit,
+    onDelete: (Routine) -> Unit
 ) {
+    var showMenu by remember { mutableStateOf(false) }
+
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick
@@ -128,11 +169,37 @@ fun RoutineItem(
                     )
                 }
             }
-            Icon(
-                imageVector = Icons.Default.ArrowForward,
-                contentDescription = null,
-                tint = Primary
-            )
+            
+            Box {
+                IconButton(onClick = { showMenu = true }) {
+                    Icon(
+                        imageVector = Icons.Default.MoreVert,
+                        contentDescription = "Opciones",
+                        tint = Color.Gray
+                    )
+                }
+                DropdownMenu(
+                    expanded = showMenu,
+                    onDismissRequest = { showMenu = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text("Editar") },
+                        leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                        onClick = {
+                            showMenu = false
+                            onEdit(routine)
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Eliminar", color = Color.Red) },
+                        leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) },
+                        onClick = {
+                            showMenu = false
+                            onDelete(routine)
+                        }
+                    )
+                }
+            }
         }
     }
 }
@@ -150,18 +217,26 @@ fun AddRoutineDialog(
         onDismissRequest = onDismiss,
         title = { Text("Nueva Rutina") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextField(
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("Nombre") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Primary,
+                        focusedLabelColor = Primary
+                    )
                 )
-                TextField(
+                OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
                     label = { Text("Descripción (opcional)") },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Primary,
+                        focusedLabelColor = Primary
+                    )
                 )
             }
         },
@@ -171,6 +246,63 @@ fun AddRoutineDialog(
                 colors = ButtonDefaults.buttonColors(containerColor = Primary)
             ) {
                 Text("Crear", color = Color.Black)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditRoutineDialog(
+    routine: Routine,
+    onDismiss: () -> Unit,
+    onConfirm: (Routine) -> Unit
+) {
+    var name by remember { mutableStateOf(routine.name) }
+    var description by remember { mutableStateOf(routine.description) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Rutina") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nombre") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Primary,
+                        focusedLabelColor = Primary
+                    )
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Descripción") },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Primary,
+                        focusedLabelColor = Primary
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (name.isNotBlank()) {
+                        onConfirm(routine.copy(name = name, description = description))
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+            ) {
+                Text("Guardar", color = Color.Black)
             }
         },
         dismissButton = {

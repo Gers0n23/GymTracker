@@ -21,7 +21,9 @@ class RoutineRepository(
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val routines = snapshot.toObjects(Routine::class.java)
+                    val routines = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(Routine::class.java)?.copy(id = doc.id)
+                    }
                     trySend(routines)
                 }
             }
@@ -29,7 +31,9 @@ class RoutineRepository(
     }
 
     suspend fun addRoutine(routine: Routine) {
-        routinesCollection.add(routine).await()
+        val docRef = routinesCollection.document()
+        val routineWithId = routine.copy(id = docRef.id)
+        docRef.set(routineWithId).await()
     }
 
     suspend fun updateRoutine(routine: Routine) {
@@ -40,5 +44,10 @@ class RoutineRepository(
 
     suspend fun deleteRoutine(routineId: String) {
         routinesCollection.document(routineId).delete().await()
+    }
+
+    suspend fun getRoutineById(routineId: String): Routine? {
+        val doc = routinesCollection.document(routineId).get().await()
+        return doc.toObject(Routine::class.java)?.copy(id = doc.id)
     }
 }

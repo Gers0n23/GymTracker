@@ -22,7 +22,9 @@ class ExerciseRepository(
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val exercises = snapshot.toObjects(Exercise::class.java)
+                    val exercises = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(Exercise::class.java)?.copy(id = doc.id)
+                    }
                     trySend(exercises)
                 }
             }

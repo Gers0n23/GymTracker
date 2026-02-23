@@ -28,9 +28,11 @@ class RoutineDetailViewModel(
     fun loadRoutineDetail(routineId: String) {
         viewModelScope.launch {
             _isLoading.value = true
-            // In a real app we would fetch the routine object too
-            // For now let's assume we have it or fetch it once
-            // Actually, we can just fetch exercises
+            
+            // Fecth routine object
+            val routineObj = routineRepository.getRoutineById(routineId)
+            _routine.value = routineObj
+
             exerciseRepository.getExercisesByRoutine(routineId).collect {
                 _exercises.value = it
                 _isLoading.value = false
@@ -38,15 +40,44 @@ class RoutineDetailViewModel(
         }
     }
 
-    fun addExercise(routineId: String, name: String, muscleGroup: String) {
+    fun updateRoutine(routineId: String, name: String, description: String) {
+        val currentRoutine = _routine.value ?: return
+        val updatedRoutine = currentRoutine.copy(name = name, description = description)
+        viewModelScope.launch {
+            routineRepository.updateRoutine(updatedRoutine)
+            _routine.value = updatedRoutine
+        }
+    }
+
+    fun deleteRoutine(routineId: String, onSuccess: () -> Unit) {
+        viewModelScope.launch {
+            routineRepository.deleteRoutine(routineId)
+            onSuccess()
+        }
+    }
+
+    fun addExercise(routineId: String, name: String, muscleGroup: String, mediaUrl: String = "") {
         val newExercise = Exercise(
             routineId = routineId,
             name = name,
             muscleGroup = muscleGroup,
+            mediaUrl = mediaUrl,
             order = _exercises.value.size
         )
         viewModelScope.launch {
             exerciseRepository.addExercise(newExercise)
+        }
+    }
+
+    fun deleteExercise(exerciseId: String) {
+        viewModelScope.launch {
+            exerciseRepository.deleteExercise(exerciseId)
+        }
+    }
+
+    fun updateExercise(exercise: Exercise) {
+        viewModelScope.launch {
+            exerciseRepository.updateExercise(exercise)
         }
     }
 }

@@ -30,11 +30,13 @@ class SessionDetailViewModel(
     private val _editableSets = MutableStateFlow<Map<String, List<SetRecord>>>(emptyMap())
     val editableSets: StateFlow<Map<String, List<SetRecord>>> = _editableSets.asStateFlow()
 
+    // Sets de la sesión anterior (para comparativa)
+    private val _previousSets = MutableStateFlow<Map<String, List<SetRecord>>>(emptyMap())
+    val previousSets: StateFlow<Map<String, List<SetRecord>>> = _previousSets.asStateFlow()
+
     fun loadSession(sessionId: String) {
         viewModelScope.launch {
             try {
-                // Load sessions list to get the session object by id
-                // We fetch sets first then derive the session from the state
                 val sets = workoutRepository.getSetsBySession(sessionId)
                 val grouped = sets.groupBy { it.exerciseName }
                 _editableSets.value = grouped
@@ -42,6 +44,17 @@ class SessionDetailViewModel(
                     setsByExercise = grouped,
                     isLoading = false
                 )
+
+                // Cargar sesión anterior para comparativa (no crítico si falla)
+                val session = _uiState.value.session
+                if (session != null && session.routineId.isNotEmpty()) {
+                    try {
+                        val prevSets = workoutRepository.getPreviousSessionSets(
+                            session.routineId, session.userId, sessionId
+                        )
+                        _previousSets.value = prevSets.groupBy { it.exerciseName }
+                    } catch (_: Exception) { /* comparativa no disponible */ }
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,

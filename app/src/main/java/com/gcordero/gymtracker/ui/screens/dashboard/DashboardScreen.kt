@@ -12,8 +12,11 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import kotlinx.coroutines.launch
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -32,9 +35,30 @@ import com.gcordero.gymtracker.ui.navigation.Screen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(navController: androidx.navigation.NavHostController) {
+fun DashboardScreen(
+    navController: androidx.navigation.NavHostController,
+    viewModel: DashboardViewModel = viewModel()
+) {
     val snackbarHostState = remember { SnackbarHostState() }
-    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val populateState by viewModel.populateState.collectAsState()
+    val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
+    val userId = auth.currentUser?.uid ?: "test_user"
+
+    // Mostrar snackbar cuando cambia el estado de la operación
+    LaunchedEffect(populateState) {
+        when (val state = populateState) {
+            is PopulateState.Loading -> snackbarHostState.showSnackbar("Cargando datos... esto puede tardar unos segundos.")
+            is PopulateState.Success -> {
+                snackbarHostState.showSnackbar("¡Base de Datos Poblada con Éxito!")
+                viewModel.resetState()
+            }
+            is PopulateState.Error -> {
+                snackbarHostState.showSnackbar("Error: ${state.message}")
+                viewModel.resetState()
+            }
+            else -> Unit
+        }
+    }
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -49,22 +73,19 @@ fun DashboardScreen(navController: androidx.navigation.NavHostController) {
                     )
                 },
                 actions = {
-                    val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
-                    val userId = auth.currentUser?.uid ?: "test_user"
-                    
-                    TextButton(onClick = {
-                        scope.launch {
-                            snackbarHostState.showSnackbar("Conectando con Firestore...")
-                            val result = com.gcordero.gymtracker.data.util.DataPopulator.populateInitialData(userId)
-                            if (result.isSuccess) {
-                                snackbarHostState.showSnackbar("¡Base de Datos Poblada con Éxito!")
-                            } else {
-                                val error = result.exceptionOrNull()
-                                snackbarHostState.showSnackbar("Error: ${error?.localizedMessage ?: "Fallo desconocido"}")
-                            }
+                    TextButton(
+                        onClick = { viewModel.populateData(userId) },
+                        enabled = populateState !is PopulateState.Loading
+                    ) {
+                        if (populateState is PopulateState.Loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(12.dp),
+                                color = Color.Gray,
+                                strokeWidth = 1.5.dp
+                            )
+                        } else {
+                            Text("DEBUG", color = Color.Gray, fontSize = 10.sp)
                         }
-                    }) {
-                        Text("DEBUG", color = Color.Gray, fontSize = 10.sp)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(

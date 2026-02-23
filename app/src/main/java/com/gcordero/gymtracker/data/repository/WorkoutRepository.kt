@@ -73,6 +73,25 @@ class WorkoutRepository(
     }
 
     /**
+     * Devuelve los sets de la sesión anterior (distinta de currentSessionId) para la misma rutina.
+     * Usado para mostrar la comparativa en el detalle de sesión.
+     */
+    suspend fun getPreviousSessionSets(routineId: String, userId: String, currentSessionId: String): List<SetRecord> {
+        val sessions = sessionsCollection
+            .whereEqualTo("userId", userId)
+            .whereEqualTo("routineId", routineId)
+            .orderBy("startTime", Query.Direction.DESCENDING)
+            .limit(5)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { it.toObject(WorkoutSession::class.java) }
+        val previousSession = sessions.firstOrNull { it.id != currentSessionId }
+            ?: return emptyList()
+        return getSetsBySession(previousSession.id)
+    }
+
+    /**
      * Obtiene los sets de la sesión más reciente para una rutina dada.
      * Usado para prefill de pesos al iniciar una nueva sesión.
      * Retorna un mapa de exerciseId -> (peso de la última serie del ejercicio)

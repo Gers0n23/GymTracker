@@ -25,12 +25,13 @@ class SessionSummaryViewModel(
         }
     }
 
-    fun saveFinal(session: WorkoutSession, rpe: Int, comments: String) {
+    fun saveFinal(session: WorkoutSession, rpe: Int, sleepQuality: Int, energyLevel: Int) {
         viewModelScope.launch {
             _isSaving.value = true
             val updated = session.copy(
                 rpe = rpe,
-                comments = comments
+                sleepQuality = sleepQuality,
+                energyLevel = energyLevel
             )
             workoutRepository.updateSession(updated)
             _isSaving.value = false

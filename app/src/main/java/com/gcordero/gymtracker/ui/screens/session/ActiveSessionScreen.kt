@@ -70,6 +70,7 @@ fun ActiveSessionScreen(
     val currentSetNum by viewModel.currentSetNumber.collectAsState()
     val routineName by viewModel.routineName.collectAsState()
     val isSessionSaved by viewModel.isSessionSaved.collectAsState()
+    val restNextAction by viewModel.restNextAction.collectAsState()
 
     val currentExercise = exercises.getOrNull(currentIndex)
     val currentExerciseSets = currentExercise?.let { sets[it.id] } ?: emptyList()
@@ -185,7 +186,9 @@ fun ActiveSessionScreen(
             RestOverlay(
                 secondsLeft = restTimer,
                 onSkip = { viewModel.skipRest() },
-                nextSetInfo = "Serie ${currentSetNum + 1} • ${currentSet?.weight ?: 0}kg"
+                nextSetInfo = "Serie ${currentSetNum + 1} • ${currentSet?.weight ?: 0}kg",
+                restNextAction = restNextAction,
+                onToggleNextAction = { viewModel.setRestNextAction(it) }
             )
         }
     }
@@ -364,7 +367,10 @@ fun ActiveExerciseFocusCard(
             if (isLastExercise) {
                 // --- Último ejercicio: botón principal = TERMINAR ENTRENAMIENTO ---
                 Button(
-                    onClick = onFinishSession,
+                    onClick = {
+                        onUpdateSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
+                        onFinishSession()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(64.dp),
@@ -383,7 +389,10 @@ fun ActiveExerciseFocusCard(
                 }
                 // Opción secundaria: hacer otra serie antes de terminar
                 TextButton(
-                    onClick = onReady,
+                    onClick = {
+                        onUpdateSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
+                        onReady()
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
@@ -395,7 +404,10 @@ fun ActiveExerciseFocusCard(
             } else {
                 // --- Ejercicio normal: botón principal = LISTO / DESCANSO ---
                 Button(
-                    onClick = onReady,
+                    onClick = {
+                        onUpdateSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
+                        onReady()
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(60.dp),
@@ -411,11 +423,14 @@ fun ActiveExerciseFocusCard(
                 }
                 // Opción secundaria: pasar al siguiente ejercicio sin descanso
                 TextButton(
-                    onClick = onFinishExercise,
+                    onClick = {
+                        onUpdateSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
+                        onFinishExercise()
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        "Terminar ejercicio →",
+                        "Siguiente Ejercicio",
                         color = Color.White.copy(alpha = 0.45f),
                         fontSize = 13.sp
                     )
@@ -479,37 +494,115 @@ fun RirFocusButton(value: Int, isSelected: Boolean, onClick: () -> Unit, modifie
 }
 
 @Composable
-fun RestOverlay(secondsLeft: Int, onSkip: () -> Unit, nextSetInfo: String) {
+fun RestOverlay(
+    secondsLeft: Int,
+    onSkip: () -> Unit,
+    nextSetInfo: String,
+    restNextAction: String = "serie",
+    onToggleNextAction: (String) -> Unit = {}
+) {
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = Color(0xFF121212).copy(alpha = 0.98f)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Text("DESCANSANDO", fontSize = 20.sp, color = Color.White.copy(alpha = 0.7f), letterSpacing = 2.sp)
+            Text(
+                "DESCANSANDO",
+                fontSize = 14.sp,
+                color = Color.White.copy(alpha = 0.5f),
+                letterSpacing = 3.sp
+            )
             Text(
                 "%02d:%02d".format(secondsLeft / 60, secondsLeft % 60),
                 fontSize = 96.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Primary
             )
-            
-            Spacer(Modifier.height(40.dp))
-            
-            GlassCard(modifier = Modifier.width(280.dp), padding = 16.dp) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("PRÓXIMA SERIE", fontSize = 12.sp, color = Color.Gray)
-                    Text(nextSetInfo, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+
+            Spacer(Modifier.height(32.dp))
+
+            // Toggle: ¿Qué hacemos al terminar el descanso?
+            GlassCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        "AL TERMINAR EL DESCANSO",
+                        fontSize = 11.sp,
+                        color = Color.Gray,
+                        letterSpacing = 1.sp
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        // Opción: otra serie
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (restNextAction == "serie") Primary
+                                    else Glass
+                                )
+                                .border(
+                                    1.dp,
+                                    if (restNextAction == "serie") Primary else GlassBorder,
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .clickable { onToggleNextAction("serie") }
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "💪  Otra serie",
+                                color = if (restNextAction == "serie") Color.Black else Color.White.copy(alpha = 0.6f),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                        // Opción: siguiente ejercicio
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(
+                                    if (restNextAction == "ejercicio") Color(0xFF3D8EFF)
+                                    else Glass
+                                )
+                                .border(
+                                    1.dp,
+                                    if (restNextAction == "ejercicio") Color(0xFF3D8EFF) else GlassBorder,
+                                    RoundedCornerShape(12.dp)
+                                )
+                                .clickable { onToggleNextAction("ejercicio") }
+                                .padding(vertical = 12.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                "⏭  Sig. ejercicio",
+                                color = if (restNextAction == "ejercicio") Color.White else Color.White.copy(alpha = 0.6f),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(Modifier.height(60.dp))
+            Spacer(Modifier.height(48.dp))
 
             TextButton(onClick = onSkip) {
-                Text("Saltar descanso (sutil)", color = Color.White.copy(alpha = 0.3f), textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline)
+                Text(
+                    "Saltar descanso",
+                    color = Color.White.copy(alpha = 0.35f),
+                    textDecoration = androidx.compose.ui.text.style.TextDecoration.Underline
+                )
             }
         }
     }

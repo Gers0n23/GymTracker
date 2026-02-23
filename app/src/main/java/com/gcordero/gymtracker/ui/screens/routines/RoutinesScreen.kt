@@ -136,6 +136,17 @@ fun RoutinesScreen(
     }
 }
 
+private fun dayOfWeekLabel(day: Int): String = when (day) {
+    1 -> "Lunes"
+    2 -> "Martes"
+    3 -> "Miércoles"
+    4 -> "Jueves"
+    5 -> "Viernes"
+    6 -> "Sábado"
+    7 -> "Domingo"
+    else -> ""
+}
+
 @Composable
 fun RoutineItem(
     routine: Routine,
@@ -144,6 +155,7 @@ fun RoutineItem(
     onDelete: (Routine) -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val dayLabel = routine.daysOfWeek.firstOrNull()?.let { dayOfWeekLabel(it) } ?: ""
 
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
@@ -155,6 +167,15 @@ fun RoutineItem(
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Column(modifier = Modifier.weight(1f)) {
+                if (dayLabel.isNotEmpty()) {
+                    Text(
+                        text = dayLabel.uppercase(),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Primary.copy(alpha = 0.7f),
+                        letterSpacing = 1.sp
+                    )
+                }
                 Text(
                     text = routine.name,
                     fontSize = 18.sp,

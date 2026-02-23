@@ -1,7 +1,10 @@
 package com.gcordero.gymtracker.ui.screens.history
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -33,13 +36,13 @@ fun SessionDetailScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val editableSets by viewModel.editableSets.collectAsState()
+    val previousSets by viewModel.previousSets.collectAsState()
 
     LaunchedEffect(session.id) {
         viewModel.setSession(session)
         viewModel.loadSession(session.id)
     }
 
-    // Snackbar on save success
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(uiState.saveSuccess) {
         if (uiState.saveSuccess) {
@@ -62,11 +65,7 @@ fun SessionDetailScreen(
                             fontWeight = FontWeight.Bold,
                             color = Primary
                         )
-                        Text(
-                            dateStr,
-                            fontSize = 12.sp,
-                            color = Color.Gray
-                        )
+                        Text(dateStr, fontSize = 12.sp, color = Color.Gray)
                     }
                 },
                 navigationIcon = {
@@ -136,12 +135,23 @@ fun SessionDetailScreen(
                             SessionSummaryCard(session = uiState.session ?: session)
                         }
 
+                        // Comparativa con sesión anterior
+                        if (previousSets.isNotEmpty()) {
+                            item {
+                                SessionComparisonCard(
+                                    editableSets = editableSets,
+                                    previousSets = previousSets
+                                )
+                            }
+                        }
+
                         // Exercise groups
                         editableSets.entries.forEach { (exerciseName, sets) ->
                             item {
                                 ExerciseEditCard(
                                     exerciseName = exerciseName,
                                     sets = sets,
+                                    previousSets = previousSets[exerciseName],
                                     onWeightChange = { idx, w ->
                                         viewModel.updateSetWeight(exerciseName, idx, w)
                                     },
@@ -155,6 +165,101 @@ fun SessionDetailScreen(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun SessionComparisonCard(
+    editableSets: Map<String, List<SetRecord>>,
+    previousSets: Map<String, List<SetRecord>>
+) {
+    val currVolume = editableSets.values.flatten().sumOf { it.weight * it.reps }
+    val prevVolume = previousSets.values.flatten().sumOf { it.weight * it.reps }
+    val volDelta = currVolume - prevVolume
+    val volDeltaPct = if (prevVolume > 0) (volDelta / prevVolume * 100) else 0.0
+
+    val currSetsCount = editableSets.values.flatten().size
+    val prevSetsCount = previousSets.values.flatten().size
+    val setsCountDelta = currSetsCount - prevSetsCount
+
+    val volColor = when {
+        volDelta > 0 -> Color(0xFF4CAF50)
+        volDelta < 0 -> Color(0xFFCF6679)
+        else -> Color.Gray
+    }
+    val volArrow = when {
+        volDelta > 0 -> "↑"
+        volDelta < 0 -> "↓"
+        else -> "→"
+    }
+
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        containerColor = volColor.copy(alpha = 0.06f),
+        borderColor = volColor.copy(alpha = 0.35f)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                "Comparativa vs Sesión Anterior",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // Volumen
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("VOLUMEN", fontSize = 10.sp, color = Color.Gray, letterSpacing = 1.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        "${prevVolume.toInt()} kg",
+                        fontSize = 14.sp,
+                        color = Color.Gray
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            "$volArrow ${currVolume.toInt()} kg",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = volColor
+                        )
+                    }
+                    val pctText = if (volDeltaPct >= 0) "+%.1f%%".format(volDeltaPct)
+                    else "%.1f%%".format(volDeltaPct)
+                    Text(pctText, fontSize = 11.sp, color = volColor, fontWeight = FontWeight.Bold)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .height(60.dp)
+                        .width(1.dp)
+                        .background(Color.White.copy(alpha = 0.1f))
+                )
+
+                // Series
+                val setsColor = when {
+                    setsCountDelta > 0 -> Color(0xFF4CAF50)
+                    setsCountDelta < 0 -> Color(0xFFCF6679)
+                    else -> Color.Gray
+                }
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("SERIES", fontSize = 10.sp, color = Color.Gray, letterSpacing = 1.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text("$prevSetsCount", fontSize = 14.sp, color = Color.Gray)
+                    Text(
+                        "→ $currSetsCount",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = setsColor
+                    )
+                    val deltaText = if (setsCountDelta >= 0) "+$setsCountDelta" else "$setsCountDelta"
+                    Text(deltaText, fontSize = 11.sp, color = setsColor, fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -200,13 +305,32 @@ fun SessionSummaryCard(session: WorkoutSession) {
                     )
                 }
             }
+            // Sleep & Energy
+            if (session.sleepQuality != null || session.energyLevel != null) {
+                Divider(color = Color.White.copy(alpha = 0.1f))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (session.sleepQuality != null) {
+                        Text(
+                            "😴 Sueño: ${session.sleepQuality}/5",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+                    if (session.energyLevel != null) {
+                        Text(
+                            "⚡ Energía: ${session.energyLevel}/5",
+                            fontSize = 12.sp,
+                            color = Color.Gray
+                        )
+                    }
+                }
+            }
             if (session.comments.isNotEmpty()) {
                 Divider(color = Color.White.copy(alpha = 0.1f))
-                Text(
-                    session.comments,
-                    fontSize = 13.sp,
-                    color = Color.Gray
-                )
+                Text(session.comments, fontSize = 13.sp, color = Color.Gray)
             }
         }
     }
@@ -224,18 +348,64 @@ fun SummaryStatItem(label: String, value: String, color: Color) {
 fun ExerciseEditCard(
     exerciseName: String,
     sets: List<SetRecord>,
+    previousSets: List<SetRecord>? = null,
     onWeightChange: (Int, Double) -> Unit,
     onRepsChange: (Int, Int) -> Unit,
     onRirChange: (Int, Int?) -> Unit
 ) {
+    // Mejor serie (max peso) de la sesión anterior
+    val prevBestSet = previousSets
+        ?.filter { it.weight > 0 }
+        ?.maxByOrNull { it.weight }
+
+    val currBestWeight = sets.filter { it.weight > 0 }.maxOfOrNull { it.weight } ?: 0.0
+    val weightDelta = if (prevBestSet != null) currBestWeight - prevBestSet.weight else null
+
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(
-                exerciseName,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
+            // Header: nombre + comparativa de peso
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Bottom
+            ) {
+                Text(
+                    exerciseName,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    modifier = Modifier.weight(1f)
+                )
+                if (prevBestSet != null && weightDelta != null) {
+                    val deltaColor = when {
+                        weightDelta > 0 -> Color(0xFF4CAF50)
+                        weightDelta < 0 -> Color(0xFFCF6679)
+                        else -> Color.Gray
+                    }
+                    val deltaText = when {
+                        weightDelta > 0 -> "+${weightDelta.toInt()}kg"
+                        weightDelta < 0 -> "${weightDelta.toInt()}kg"
+                        else -> "="
+                    }
+                    Text(
+                        deltaText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = deltaColor
+                    )
+                }
+            }
+
+            // Referencia de sesión anterior
+            if (prevBestSet != null) {
+                Text(
+                    "Anterior: ${prevBestSet.weight.toInt()}kg × ${prevBestSet.reps} reps" +
+                        if (prevBestSet.rir != null) " · RIR ${prevBestSet.rir}" else "",
+                    fontSize = 11.sp,
+                    color = Color.Gray
+                )
+            }
+
             Divider(color = Color.White.copy(alpha = 0.1f))
 
             // Header row

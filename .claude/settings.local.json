@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew compileDebugKotlin:*)",
+      "Bash(cmd /c \"gradlew.bat compileDebugKotlin 2>&1\")",
+      "Bash(cmd /c:*)",
+      "Bash(./gradlew.bat compileDebugKotlin:*)",
+      "Bash(echo:*)"
+    ]
+  }
+}

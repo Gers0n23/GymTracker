@@ -27,6 +27,15 @@ import com.gcordero.gymtracker.domain.model.Exercise
 import com.gcordero.gymtracker.ui.components.GlassCard
 import com.gcordero.gymtracker.ui.theme.Primary
 
+private fun dayLabel(days: List<Int>): String {
+    val name = when (days.firstOrNull()) {
+        1 -> "Lunes"; 2 -> "Martes"; 3 -> "Miércoles"
+        4 -> "Jueves"; 5 -> "Viernes"; 6 -> "Sábado"; 7 -> "Domingo"
+        else -> return ""
+    }
+    return name.uppercase()
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RoutineDetailScreen(
@@ -52,18 +61,28 @@ fun RoutineDetailScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Column {
+                        val day = dayLabel(routine?.daysOfWeek ?: emptyList())
+                        if (day.isNotEmpty()) {
+                            Text(
+                                text = day,
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = Primary.copy(alpha = 0.7f),
+                                letterSpacing = 1.sp
+                            )
+                        }
                         Text(
-                            routine?.name ?: "Cargando...", 
-                            color = Primary, 
-                            fontSize = 20.sp, 
+                            routine?.name ?: "Cargando...",
+                            color = Primary,
+                            fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
                         if (routine?.description?.isNotEmpty() == true) {
                             Text(
-                                routine?.description ?: "", 
-                                color = Color.Gray, 
+                                routine?.description ?: "",
+                                color = Color.Gray,
                                 fontSize = 12.sp,
                                 maxLines = 1
                             )

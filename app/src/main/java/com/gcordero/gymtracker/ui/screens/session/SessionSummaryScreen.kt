@@ -2,6 +2,7 @@ package com.gcordero.gymtracker.ui.screens.session
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -34,9 +35,9 @@ fun SessionSummaryScreen(
 ) {
     val sets by viewModel.sets.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
-    
+
     var rpe by remember { mutableFloatStateOf(8f) }
-    var sleepQuality by remember { mutableIntStateOf(4) }
+    var sleepQuality by remember { mutableIntStateOf(3) }
     var energyLevel by remember { mutableIntStateOf(3) }
     var showResults by remember { mutableStateOf(false) }
 
@@ -102,9 +103,9 @@ fun SessionSummaryScreen(
 
                 item {
                     GlassCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
                             Text("Estado de la Sesión", fontWeight = FontWeight.Bold, color = Color.White)
-                            
+
                             // RPE
                             Column {
                                 Row(
@@ -130,34 +131,69 @@ fun SessionSummaryScreen(
                                 }
                             }
 
-                            // Sleep
-                            Column {
-                                Text("Calidad de Sueño", fontSize = 12.sp, color = Color.Gray)
+                            // Sleep Quality
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Calidad de Sueño", fontSize = 13.sp, color = Color.Gray)
+                                    Text("$sleepQuality / 5", color = Secondary, fontWeight = FontWeight.Bold)
+                                }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     (1..5).forEach { i ->
                                         Text(
                                             "😴",
                                             modifier = Modifier
-                                                .size(32.dp)
-                                                .background(if (sleepQuality >= i) Primary.copy(alpha = 0.2f) else Color.Transparent)
-                                                .border(1.dp, if (sleepQuality >= i) Primary else Color.Transparent, RoundedCornerShape(4.dp))
-                                            ,
-                                            fontSize = 20.sp,
+                                                .size(40.dp)
+                                                .background(
+                                                    if (sleepQuality >= i) Secondary.copy(alpha = 0.2f)
+                                                    else Color.Transparent,
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .border(
+                                                    1.dp,
+                                                    if (sleepQuality >= i) Secondary else GlassBorder,
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .clickable { sleepQuality = i }
+                                                .wrapContentSize(Alignment.Center),
+                                            fontSize = 22.sp,
                                             textAlign = TextAlign.Center
                                         )
                                     }
                                 }
                             }
 
-                            // Energy
-                            Column {
-                                Text("Nivel de Energía", fontSize = 12.sp, color = Color.Gray)
+                            // Energy Level
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text("Nivel de Energía", fontSize = 13.sp, color = Color.Gray)
+                                    Text("$energyLevel / 5", color = Color(0xFFFFD600), fontWeight = FontWeight.Bold)
+                                }
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     (1..5).forEach { i ->
                                         Text(
                                             "⚡",
-                                            fontSize = 20.sp,
-                                            modifier = Modifier.padding(2.dp)
+                                            modifier = Modifier
+                                                .size(40.dp)
+                                                .background(
+                                                    if (energyLevel >= i) Color(0xFFFFD600).copy(alpha = 0.15f)
+                                                    else Color.Transparent,
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .border(
+                                                    1.dp,
+                                                    if (energyLevel >= i) Color(0xFFFFD600) else GlassBorder,
+                                                    RoundedCornerShape(8.dp)
+                                                )
+                                                .clickable { energyLevel = i }
+                                                .wrapContentSize(Alignment.Center),
+                                            fontSize = 22.sp,
+                                            textAlign = TextAlign.Center
                                         )
                                     }
                                 }
@@ -217,9 +253,9 @@ fun SessionSummaryScreen(
 
                 item {
                     Button(
-                        onClick = { 
-                            viewModel.saveFinal(session, rpe.toInt(), "Sueño: $sleepQuality, Energía: $energyLevel")
-                            onFinish() 
+                        onClick = {
+                            viewModel.saveFinal(session, rpe.toInt(), sleepQuality, energyLevel)
+                            onFinish()
                         },
                         modifier = Modifier
                             .fillMaxWidth()

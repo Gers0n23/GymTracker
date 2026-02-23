@@ -11,7 +11,9 @@ data class WorkoutSession(
     val endTime: Timestamp? = null,
     val totalWeightLifted: Double = 0.0,
     val comments: String = "",
-    val rpe: Int? = null // Rate of Perceived Exertion
+    val rpe: Int? = null, // Rate of Perceived Exertion
+    val sleepQuality: Int? = null, // 1–5
+    val energyLevel: Int? = null   // 1–5
 )
 
 data class SetRecord(

@@ -4,162 +4,949 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GymTracker Dashboard</title>
+    <title>GymTracker — Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        .summary-stats {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
-            margin: 15px;
+        /* ============================
+           RESET & VARIABLES
+        ============================ */
+        *, *::before, *::after {
+            margin: 0; padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        .stat-card {
-            background: var(--glass);
-            padding: 15px;
-            border-radius: 16px;
-            border: 1px solid var(--glass-border);
-            text-align: center;
+        :root {
+            --bg:           #0D0D0D;
+            --surface:      #161616;
+            --surface-2:    #1E1E1E;
+            --primary:      #6366F1;
+            --primary-dim:  rgba(99,102,241,0.15);
+            --primary-glow: rgba(99,102,241,0.3);
+            --text-1:       #F0F0F0;
+            --text-2:       #888;
+            --text-3:       #4A4A4A;
+            --border:       rgba(255,255,255,0.07);
+            --green:        #34D399;
+            --amber:        #FBBF24;
+            --red:          #F87171;
+            --font:         'Inter', sans-serif;
         }
 
-        .stat-value {
-            font-size: 24px;
-            font-weight: 700;
-            display: block;
+        body {
+            background: var(--bg);
+            color: var(--text-1);
+            font-family: var(--font);
+            line-height: 1.5;
+            overflow-x: hidden;
         }
 
-        .stat-label {
-            font-size: 12px;
-            opacity: 0.7;
+        .app {
+            max-width: 420px;
+            margin: 0 auto;
+            min-height: 100vh;
+            padding-bottom: 80px;
         }
 
-        .routine-preview {
-            margin: 15px;
-            padding: 20px;
-            background: linear-gradient(135deg, #2c3e50, #000000);
+        /* ============================
+           HEADER
+        ============================ */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            position: sticky;
+            top: 0;
+            background: rgba(13,13,13,0.92);
+            -webkit-backdrop-filter: blur(16px);
+            backdrop-filter: blur(16px);
+            z-index: 100;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .header-logo {
+            font-size: 17px;
+            font-weight: 800;
+            letter-spacing: -0.4px;
+            background: linear-gradient(135deg, #818CF8, #A78BFA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .avatar {
+            width: 32px; height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), #8B5CF6);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700; color: white;
+        }
+
+        /* ============================
+           GREETING + STREAK
+        ============================ */
+        .greeting {
+            padding: 18px 20px 12px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+        }
+
+        .greeting-sub {
+            font-size: 13px;
+            color: var(--text-2);
+            font-weight: 400;
+        }
+
+        .greeting-name {
+            font-size: 26px;
+            font-weight: 800;
+            letter-spacing: -0.6px;
+            margin-top: 1px;
+        }
+
+        .streak-badge {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(251,191,36,0.08);
+            border: 1px solid rgba(251,191,36,0.18);
+            border-radius: 12px;
+            padding: 8px 12px;
+            gap: 0;
+        }
+
+        .streak-fire { font-size: 16px; line-height: 1; }
+        .streak-number { font-size: 20px; font-weight: 800; color: #FBBF24; line-height: 1.1; }
+        .streak-label { font-size: 9px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.5px; }
+
+        /* ============================
+           HERO CARD — TODAY'S WORKOUT
+        ============================ */
+        .hero-card {
+            margin: 0 16px 14px;
             border-radius: 20px;
+            background: linear-gradient(140deg, #0d0d28 0%, #141030 60%, #1a1040 100%);
+            border: 1px solid rgba(99,102,241,0.28);
+            padding: 18px 18px 16px;
             position: relative;
             overflow: hidden;
         }
 
-        .routine-preview::after {
+        .hero-card::before {
             content: '';
             position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle, rgba(187, 134, 252, 0.1) 0%, transparent 70%);
-            z-index: 1;
+            top: -50px; right: -50px;
+            width: 160px; height: 160px;
+            background: radial-gradient(circle, rgba(99,102,241,0.22) 0%, transparent 70%);
+            pointer-events: none;
         }
 
-        .streak-info {
+        .hero-day-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+            color: #818CF8;
+            background: rgba(99,102,241,0.12);
+            border: 1px solid rgba(99,102,241,0.2);
+            padding: 4px 10px;
+            border-radius: 20px;
+            margin-bottom: 10px;
+        }
+
+        .hero-routine-name {
+            font-size: 19px;
+            font-weight: 700;
+            letter-spacing: -0.4px;
+            color: var(--text-1);
+            margin-bottom: 5px;
+        }
+
+        .hero-meta {
+            font-size: 12px;
+            color: var(--text-2);
+            margin-bottom: 14px;
+            display: flex;
+            gap: 8px;
+        }
+
+        .hero-exercises {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 16px;
+        }
+
+        .exercise-chip {
+            font-size: 11px;
+            padding: 4px 10px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 20px;
+            color: var(--text-2);
+        }
+
+        .btn-start {
+            width: 100%;
+            padding: 13px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 13px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: var(--font);
+            cursor: pointer;
+            letter-spacing: -0.1px;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-top: 20px;
+            gap: 8px;
+            transition: opacity 0.15s;
         }
+
+        .btn-start:active { opacity: 0.82; }
+
+        /* ============================
+           SMART TIPS
+        ============================ */
+        .section { margin: 0 16px 14px; }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .section-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-2);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .tips-list { display: flex; flex-direction: column; gap: 8px; }
+
+        .tip-card {
+            background: var(--surface);
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            padding: 12px 13px;
+            display: flex;
+            align-items: flex-start;
+            gap: 11px;
+        }
+
+        .tip-icon {
+            width: 30px; height: 30px;
+            border-radius: 9px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .tip-icon.weight { background: rgba(52,211,153,0.12); color: var(--green); }
+        .tip-icon.reps   { background: rgba(99,102,241,0.12); color: var(--primary); }
+        .tip-icon.sets   { background: rgba(251,191,36,0.12); color: var(--amber); }
+
+        .tip-exercise { font-size: 13px; font-weight: 600; color: var(--text-1); margin-bottom: 2px; }
+        .tip-text     { font-size: 11px; color: var(--text-2); line-height: 1.45; }
+
+        /* ============================
+           CARD (shared)
+        ============================ */
+        .card {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 16px;
+            margin: 0 16px 14px;
+            border: 1px solid var(--border);
+        }
+
+        /* ============================
+           MUSCLE RECOVERY MAP
+        ============================ */
+        .recovery-legend {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .legend-item {
+            display: flex; align-items: center; gap: 5px;
+            font-size: 10px; color: var(--text-2);
+        }
+
+        .legend-dot {
+            width: 7px; height: 7px; border-radius: 50%;
+        }
+        .legend-dot.today    { background: var(--primary); }
+        .legend-dot.ready    { background: var(--green); }
+        .legend-dot.loading  { background: var(--amber); }
+        .legend-dot.fatigued { background: var(--red); }
+
+        .muscle-container {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 20px;
+        }
+
+        .body-svg-wrap {
+            display: flex; flex-direction: column;
+            align-items: center; gap: 6px;
+        }
+
+        .body-view-label {
+            font-size: 9px; color: var(--text-3);
+            text-transform: uppercase; letter-spacing: 0.8px;
+        }
+
+        .muscle-zone {
+            cursor: pointer;
+            transition: opacity 0.2s, filter 0.2s;
+        }
+        .muscle-zone:hover { filter: brightness(1.25); }
+
+        .muscle-label {
+            font-size: 7.5px;
+            fill: rgba(255,255,255,0.55);
+            text-anchor: middle;
+            pointer-events: none;
+            font-family: 'Inter', sans-serif;
+            font-weight: 500;
+        }
+
+        /* Pulse animation for today's muscles */
+        @keyframes pulse-ring {
+            0%   { opacity: 0.7; }
+            50%  { opacity: 0.3; }
+            100% { opacity: 0.7; }
+        }
+
+        .pulse-today { animation: pulse-ring 2s ease-in-out infinite; }
+
+        /* ============================
+           WEEKLY CHART
+        ============================ */
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 14px;
+        }
+
+        .chart-volume { font-size: 20px; font-weight: 700; }
+        .chart-delta  { font-size: 12px; font-weight: 600; }
+
+        .positive { color: var(--green); }
+        .negative { color: var(--red); }
+
+        .week-chart {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            height: 72px;
+            gap: 5px;
+        }
+
+        .week-bar-wrap {
+            flex: 1;
+            display: flex; flex-direction: column;
+            align-items: center; gap: 6px;
+            height: 100%; justify-content: flex-end;
+        }
+
+        .week-bar {
+            width: 100%; max-width: 26px;
+            border-radius: 4px 4px 0 0;
+            min-height: 3px;
+        }
+
+        .week-bar.trained { background: rgba(99,102,241,0.55); }
+        .week-bar.today   { background: var(--primary); box-shadow: 0 0 8px var(--primary-glow); }
+        .week-bar.rest    { background: var(--surface-2); background: #1e1e1e; }
+
+        .week-day { font-size: 10px; color: var(--text-3); font-weight: 500; }
+        .week-day.today-label { color: var(--primary); font-weight: 700; }
+
+        /* ============================
+           STATS GRID
+        ============================ */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            padding: 0 16px;
+            margin-bottom: 14px;
+        }
+
+        .stat-mini {
+            background: var(--surface);
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            padding: 12px 8px;
+            text-align: center;
+        }
+
+        .stat-mini-value {
+            font-size: 18px; font-weight: 700;
+            color: var(--text-1); display: block;
+        }
+
+        .stat-mini-label {
+            font-size: 9px; color: var(--text-2);
+            margin-top: 3px; display: block;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+
+        /* ============================
+           BOTTOM NAV
+        ============================ */
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 50%;
+            transform: translateX(-50%);
+            width: 100%; max-width: 420px;
+            background: rgba(13,13,13,0.95);
+            -webkit-backdrop-filter: blur(16px);
+            backdrop-filter: blur(16px);
+            border-top: 1px solid var(--border);
+            display: flex; justify-content: space-around;
+            padding: 10px 0 16px;
+            z-index: 1000;
+        }
+
+        .nav-item {
+            display: flex; flex-direction: column;
+            align-items: center; gap: 4px;
+            color: var(--text-3);
+            text-decoration: none;
+            font-size: 10px; font-family: var(--font);
+            font-weight: 500;
+            padding: 0 14px;
+            transition: color 0.15s;
+        }
+
+        .nav-item.active { color: var(--primary); }
+        .nav-item svg { width: 20px; height: 20px; }
+
+        /* ============================
+           BOTTOM SHEET MODAL
+        ============================ */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.65);
+            z-index: 200;
+            display: flex; align-items: flex-end;
+            opacity: 0; pointer-events: none;
+            transition: opacity 0.2s;
+        }
+
+        .modal-overlay.open {
+            opacity: 1; pointer-events: all;
+        }
+
+        .modal-sheet {
+            width: 100%; max-width: 420px;
+            margin: 0 auto;
+            background: #1a1a1a;
+            border-radius: 24px 24px 0 0;
+            padding: 16px 20px 36px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            transform: translateY(100%);
+            transition: transform 0.3s cubic-bezier(0.32,0.72,0,1);
+        }
+
+        .modal-overlay.open .modal-sheet { transform: translateY(0); }
+
+        .modal-handle {
+            width: 36px; height: 4px;
+            background: #333; border-radius: 2px;
+            margin: 0 auto 16px;
+        }
+
+        .modal-muscle-header {
+            display: flex; align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+        }
+
+        .modal-muscle-name { font-size: 20px; font-weight: 700; }
+
+        .modal-status-badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-size: 11px; font-weight: 600;
+            padding: 4px 10px; border-radius: 20px;
+        }
+
+        .badge-ready     { background: rgba(52,211,153,0.12); color: var(--green); }
+        .badge-recovering{ background: rgba(251,191,36,0.12); color: var(--amber); }
+        .badge-fatigued  { background: rgba(248,113,113,0.12); color: var(--red); }
+        .badge-today     { background: var(--primary-dim); color: #818CF8; }
+
+        .modal-rest-info {
+            font-size: 12px; color: var(--text-2);
+            margin-bottom: 20px; margin-top: 4px;
+        }
+
+        .modal-chart-title {
+            font-size: 10px; font-weight: 600;
+            color: var(--text-2); text-transform: uppercase;
+            letter-spacing: 0.9px; margin-bottom: 10px;
+        }
+
+        .modal-bars {
+            display: flex; align-items: flex-end;
+            gap: 8px; height: 80px;
+        }
+
+        .modal-bar-wrap {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; gap: 6px;
+            height: 100%; justify-content: flex-end;
+        }
+
+        .modal-bar { width: 100%; border-radius: 4px 4px 0 0; }
+        .modal-bar.current { background: var(--primary); box-shadow: 0 0 8px var(--primary-glow); }
+        .modal-bar.past    { background: rgba(99,102,241,0.3); }
+        .modal-bar-label   { font-size: 9px; color: var(--text-3); }
+
+        /* ============================
+           ANIMATIONS
+        ============================ */
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .a1 { animation: fadeUp 0.35s 0.05s ease both; }
+        .a2 { animation: fadeUp 0.35s 0.10s ease both; }
+        .a3 { animation: fadeUp 0.35s 0.16s ease both; }
+        .a4 { animation: fadeUp 0.35s 0.22s ease both; }
+        .a5 { animation: fadeUp 0.35s 0.28s ease both; }
+        .a6 { animation: fadeUp 0.35s 0.34s ease both; }
+
+        /* ============================
+           UTILITY — replaces inline styles
+        ============================ */
+        .section-header--tight  { margin-bottom: 10px; }
+        .section-header--chart  { margin-bottom: 12px; }
+        .chart-delta-row        { display: flex; align-items: baseline; gap: 2px; }
+
+        /* Week bar heights (mock data) */
+        .bar-h-100 { height: 100%; }
+        .bar-h-78  { height: 78%; }
+        .bar-h-62  { height: 62%; }
+        .bar-h-55  { height: 55%; }
+        .bar-h-8   { height: 8%; }
+        .bar-today-stub {
+            height: 4px;
+            min-height: 4px;
+            background: var(--primary);
+            opacity: 0.4;
+            border-radius: 4px 4px 0 0;
+        }
+
+        /* Stat accent colors */
+        .text-amber { color: var(--amber); }
+        .text-green { color: var(--green); }
+
+        /* Section sub-label */
+        .section-sub { font-size: 10px; color: var(--text-3); }
+        .section-sub--right { font-size: 10px; color: var(--text-3); }
     </style>
 </head>
 
 <body>
-    <div class="app-container">
-        <header>
-            <h1>FitTracker</h1>
+    <div class="app">
+
+        <!-- ── HEADER ─────────────────────── -->
+        <header class="header">
+            <span class="header-logo">GymTracker</span>
+            <div class="avatar">G</div>
         </header>
 
-        <section style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 15px; margin: 15px;" class="animate"
-            style="animation-delay: 0.1s;">
-            <div class="card"
-                style="margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;">
-                <h3 style="font-size: 12px; margin-bottom: 10px; width: 100%;">Recuperación Muscular</h3>
-                <div class="muscle-map">
-                    <!-- Front view silhouette simplified -->
-                    <div class="muscle-indicator fatigued" style="top: 20%; left: 30%;"></div> <!-- Pecho L -->
-                    <div class="muscle-indicator fatigued" style="top: 20%; right: 30%;"></div> <!-- Pecho R -->
-                    <div class="muscle-indicator recovered" style="bottom: 30%; left: 30%;"></div> <!-- Pierna -->
-                    <div style="font-size: 40px; text-align: center; margin-top: 50px; opacity: 0.3;">👤</div>
-                </div>
-                <p style="font-size: 9px; opacity: 0.5; margin-top: 10px;">Pecho fatigado (42h rest)</p>
+        <!-- ── GREETING + STREAK ──────────── -->
+        <div class="greeting a1">
+            <div>
+                <p class="greeting-sub">Buenos días</p>
+                <h1 class="greeting-name">Gerson</h1>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 15px;">
-                <div class="stat-card" style="flex: 1;">
-                    <span class="stat-label">Volumen Semanal</span>
-                    <span class="stat-value" style="font-size: 18px;">12,450 kg</span>
-                    <div style="height: 4px; background: var(--glass); border-radius: 2px; margin-top: 10px;">
-                        <div style="width: 75%; height: 100%; background: var(--primary);"></div>
+            <div class="streak-badge">
+                <span class="streak-fire">🔥</span>
+                <span class="streak-number">4</span>
+                <span class="streak-label">días</span>
+            </div>
+        </div>
+
+        <!-- ── HERO: TODAY'S WORKOUT ──────── -->
+        <div class="hero-card a2">
+            <div class="hero-day-tag">
+                <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                    <circle cx="5" cy="5" r="4" stroke="currentColor" stroke-width="1.5"/>
+                    <path d="M5 3v2.2l1.4 1.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+                </svg>
+                Martes &middot; Hoy
+            </div>
+            <h2 class="hero-routine-name">Piernas — Cuádriceps + Glúteos</h2>
+            <div class="hero-meta">
+                <span>4 ejercicios</span>
+                <span>·</span>
+                <span>~50 min</span>
+            </div>
+            <div class="hero-exercises">
+                <span class="exercise-chip">Sentadilla c/ barra</span>
+                <span class="exercise-chip">Prensa de piernas</span>
+                <span class="exercise-chip">Extensiones</span>
+                <span class="exercise-chip">+1 más</span>
+            </div>
+            <button class="btn-start" type="button">
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M4 2.5l6 4.5-6 4.5V2.5z" fill="currentColor"/>
+                </svg>
+                Iniciar Entrenamiento
+            </button>
+        </div>
+
+        <!-- ── SMART TIPS ─────────────────── -->
+        <div class="section a3">
+            <div class="section-header">
+                <span class="section-title">Recomendaciones para hoy</span>
+                <span class="section-sub">Basadas en tu historial</span>
+            </div>
+            <div class="tips-list">
+                <div class="tip-card">
+                    <div class="tip-icon weight">↑</div>
+                    <div>
+                        <p class="tip-exercise">Sentadilla con Barra</p>
+                        <p class="tip-text">Sube 2.5 kg esta sesión — completaste todas las series al 100% las últimas 3 veces</p>
                     </div>
                 </div>
-                <div class="stat-card" style="flex: 1;">
-                    <span class="stat-label">Series Efectivas</span>
-                    <div style="display: flex; gap: 5px; margin-top: 10px;">
-                        <div style="width: 8px; height: 15px; background: var(--primary); border-radius: 2px;"></div>
-                        <div style="width: 8px; height: 25px; background: var(--primary); border-radius: 2px;"></div>
-                        <div style="width: 8px; height: 20px; background: var(--primary); border-radius: 2px;"></div>
-                        <div style="width: 8px; height: 35px; background: var(--secondary); border-radius: 2px;"></div>
+                <div class="tip-card">
+                    <div class="tip-icon reps">+</div>
+                    <div>
+                        <p class="tip-exercise">Extensiones de Cuádriceps</p>
+                        <p class="tip-text">Aumenta a 12 reps — llegaste a 10/10 sin esfuerzo en la última sesión</p>
+                    </div>
+                </div>
+                <div class="tip-card">
+                    <div class="tip-icon sets">≡</div>
+                    <div>
+                        <p class="tip-exercise">Prensa de Piernas</p>
+                        <p class="tip-text">Añade 1 serie extra — tu volumen en cuádriceps está 15% por debajo del objetivo</p>
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
 
-        <section class="animate" style="animation-delay: 0.2s;">
-            <div class="routine-preview">
-                <p style="font-size: 11px; opacity: 0.8; color: var(--secondary);">¡Tus piernas están listas! ⚡</p>
-                <h2 style="font-size: 24px; margin-bottom: 5px;">Empuje + Pecho</h2>
-                <a href="active_session.html" class="btn btn-primary"
-                    style="display: block; text-decoration: none; margin-top: 15px;">Empezar sesión</a>
+        <!-- ── MUSCLE RECOVERY MAP ────────── -->
+        <div class="card a4">
+            <div class="section-header section-header--tight">
+                <span class="section-title">Recuperación Muscular</span>
+                <span class="section-sub">Toca un grupo</span>
             </div>
-        </section>
 
-        <section class="card animate" style="animation-delay: 0.3s;">
-            <h3>Progreso Semanal</h3>
-            <div
-                style="height: 100px; display: flex; align-items: flex-end; justify-content: space-around; padding-top: 20px;">
-                <div style="width: 20px; background: var(--primary); height: 40%; border-radius: 4px 4px 0 0;"></div>
-                <div style="width: 20px; background: var(--primary); height: 70%; border-radius: 4px 4px 0 0;"></div>
-                <div style="width: 20px; background: var(--primary); height: 90%; border-radius: 4px 4px 0 0;"></div>
-                <div style="width: 20px; background: var(--primary); height: 100%; border-radius: 4px 4px 0 0;"></div>
-                <div style="width: 20px; background: var(--glass); height: 20%; border-radius: 4px 4px 0 0;"></div>
-                <div style="width: 20px; background: var(--glass); height: 20%; border-radius: 4px 4px 0 0;"></div>
-                <div style="width: 20px; background: var(--glass); height: 20%; border-radius: 4px 4px 0 0;"></div>
+            <div class="recovery-legend">
+                <div class="legend-item"><span class="legend-dot today"></span>Objetivo hoy</div>
+                <div class="legend-item"><span class="legend-dot ready"></span>Listo</div>
+                <div class="legend-item"><span class="legend-dot loading"></span>Cargando</div>
+                <div class="legend-item"><span class="legend-dot fatigued"></span>Fatigado</div>
             </div>
-            <div style="display: flex; justify-content: space-around; margin-top: 10px; font-size: 10px; opacity: 0.5;">
-                <span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span>
-            </div>
-        </section>
 
-        <section class="card animate" style="animation-delay: 0.4s;">
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <h3>Estado Diario</h3>
-                    <p style="font-size: 12px; opacity: 0.7;">Calidad de sueño y energía</p>
+            <div class="muscle-container">
+                <!-- FRONTAL -->
+                <div class="body-svg-wrap">
+                    <span class="body-view-label">Frontal</span>
+                    <svg width="108" height="216" viewBox="0 0 108 216" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Silhouette (non-interactive background) -->
+                        <g fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.22)" stroke-width="1" pointer-events="none">
+                            <circle cx="54" cy="17" r="13"/>
+                            <rect x="48" y="29" width="12" height="10" rx="3"/>
+                            <path d="M30,39 Q54,35 78,39 L74,93 Q54,97 34,93 Z"/>
+                            <path d="M30,39 Q18,45 15,60 L14,97 Q20,101 28,99 L34,64 Z"/>
+                            <path d="M78,39 Q90,45 93,60 L94,97 Q88,101 80,99 L74,64 Z"/>
+                            <rect x="31" y="93" width="46" height="16" rx="5"/>
+                            <rect x="31" y="107" width="18" height="75" rx="8"/>
+                            <rect x="59" y="107" width="18" height="75" rx="8"/>
+                        </g>
+
+                        <!-- SHOULDERS — recovering (amber) -->
+                        <ellipse class="muscle-zone" data-group="shoulders"
+                            cx="25" cy="46" rx="11" ry="9"
+                            fill="rgba(251,191,36,0.45)" stroke="rgba(251,191,36,0.25)" stroke-width="1"/>
+                        <ellipse class="muscle-zone" data-group="shoulders"
+                            cx="83" cy="46" rx="11" ry="9"
+                            fill="rgba(251,191,36,0.45)" stroke="rgba(251,191,36,0.25)" stroke-width="1"/>
+                        <text class="muscle-label" x="25" y="50">Hombros</text>
+                        <text class="muscle-label" x="83" y="50">Hombros</text>
+
+                        <!-- CHEST — fatigued (red) -->
+                        <ellipse class="muscle-zone" data-group="chest"
+                            cx="45" cy="57" rx="13" ry="11"
+                            fill="rgba(248,113,113,0.45)" stroke="rgba(248,113,113,0.25)" stroke-width="1"/>
+                        <ellipse class="muscle-zone" data-group="chest"
+                            cx="63" cy="57" rx="13" ry="11"
+                            fill="rgba(248,113,113,0.45)" stroke="rgba(248,113,113,0.25)" stroke-width="1"/>
+                        <text class="muscle-label" x="54" y="62">Pecho</text>
+
+                        <!-- BICEPS — recovering (amber) -->
+                        <rect class="muscle-zone" data-group="biceps"
+                            x="15" y="53" width="11" height="26" rx="5"
+                            fill="rgba(251,191,36,0.4)" stroke="rgba(251,191,36,0.2)" stroke-width="1"/>
+                        <rect class="muscle-zone" data-group="biceps"
+                            x="82" y="53" width="11" height="26" rx="5"
+                            fill="rgba(251,191,36,0.4)" stroke="rgba(251,191,36,0.2)" stroke-width="1"/>
+
+                        <!-- CORE / ABS — ready (green) -->
+                        <rect class="muscle-zone" data-group="core"
+                            x="40" y="71" width="28" height="21" rx="6"
+                            fill="rgba(52,211,153,0.45)" stroke="rgba(52,211,153,0.25)" stroke-width="1"/>
+                        <text class="muscle-label" x="54" y="82">Core</text>
+
+                        <!-- QUADS — TODAY (indigo, pulse) -->
+                        <rect class="muscle-zone pulse-today" data-group="quads"
+                            x="32" y="109" width="16" height="46" rx="7"
+                            fill="rgba(99,102,241,0.6)" stroke="rgba(130,132,255,0.5)" stroke-width="1.5"/>
+                        <rect class="muscle-zone pulse-today" data-group="quads"
+                            x="60" y="109" width="16" height="46" rx="7"
+                            fill="rgba(99,102,241,0.6)" stroke="rgba(130,132,255,0.5)" stroke-width="1.5"/>
+                        <text class="muscle-label" x="40" y="134">Cuáds</text>
+                        <text class="muscle-label" x="68" y="134">Cuáds</text>
+
+                        <!-- CALVES — ready (green) -->
+                        <rect class="muscle-zone" data-group="calves"
+                            x="32" y="158" width="14" height="28" rx="6"
+                            fill="rgba(52,211,153,0.38)" stroke="rgba(52,211,153,0.2)" stroke-width="1"/>
+                        <rect class="muscle-zone" data-group="calves"
+                            x="62" y="158" width="14" height="28" rx="6"
+                            fill="rgba(52,211,153,0.38)" stroke="rgba(52,211,153,0.2)" stroke-width="1"/>
+                        <text class="muscle-label" x="39" y="174">Gemelos</text>
+                        <text class="muscle-label" x="69" y="174">Gemelos</text>
+                    </svg>
                 </div>
-                <span style="font-size: 24px;">⚡</span>
-            </div>
-        </section>
 
+                <!-- POSTERIOR -->
+                <div class="body-svg-wrap">
+                    <span class="body-view-label">Posterior</span>
+                    <svg width="108" height="216" viewBox="0 0 108 216" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Silhouette -->
+                        <g fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.22)" stroke-width="1" pointer-events="none">
+                            <circle cx="54" cy="17" r="13"/>
+                            <rect x="48" y="29" width="12" height="10" rx="3"/>
+                            <path d="M30,39 Q54,35 78,39 L74,93 Q54,97 34,93 Z"/>
+                            <path d="M30,39 Q18,45 15,60 L14,97 Q20,101 28,99 L34,64 Z"/>
+                            <path d="M78,39 Q90,45 93,60 L94,97 Q88,101 80,99 L74,64 Z"/>
+                            <rect x="31" y="93" width="46" height="16" rx="5"/>
+                            <rect x="31" y="107" width="18" height="75" rx="8"/>
+                            <rect x="59" y="107" width="18" height="75" rx="8"/>
+                        </g>
+
+                        <!-- BACK (Espalda) — ready (green) -->
+                        <ellipse class="muscle-zone" data-group="back"
+                            cx="54" cy="58" rx="22" ry="19"
+                            fill="rgba(52,211,153,0.4)" stroke="rgba(52,211,153,0.22)" stroke-width="1"/>
+                        <text class="muscle-label" x="54" y="63">Espalda</text>
+
+                        <!-- TRICEPS — recovering (amber) -->
+                        <rect class="muscle-zone" data-group="triceps"
+                            x="15" y="53" width="11" height="26" rx="5"
+                            fill="rgba(251,191,36,0.4)" stroke="rgba(251,191,36,0.2)" stroke-width="1"/>
+                        <rect class="muscle-zone" data-group="triceps"
+                            x="82" y="53" width="11" height="26" rx="5"
+                            fill="rgba(251,191,36,0.4)" stroke="rgba(251,191,36,0.2)" stroke-width="1"/>
+
+                        <!-- GLUTES — TODAY (indigo, pulse) -->
+                        <ellipse class="muscle-zone pulse-today" data-group="glutes"
+                            cx="43" cy="104" rx="11" ry="10"
+                            fill="rgba(99,102,241,0.6)" stroke="rgba(130,132,255,0.5)" stroke-width="1.5"/>
+                        <ellipse class="muscle-zone pulse-today" data-group="glutes"
+                            cx="65" cy="104" rx="11" ry="10"
+                            fill="rgba(99,102,241,0.6)" stroke="rgba(130,132,255,0.5)" stroke-width="1.5"/>
+                        <text class="muscle-label" x="43" y="108">Glút</text>
+                        <text class="muscle-label" x="65" y="108">Glút</text>
+
+                        <!-- HAMSTRINGS — ready (green) -->
+                        <rect class="muscle-zone" data-group="hamstrings"
+                            x="32" y="116" width="16" height="40" rx="7"
+                            fill="rgba(52,211,153,0.4)" stroke="rgba(52,211,153,0.22)" stroke-width="1"/>
+                        <rect class="muscle-zone" data-group="hamstrings"
+                            x="60" y="116" width="16" height="40" rx="7"
+                            fill="rgba(52,211,153,0.4)" stroke="rgba(52,211,153,0.22)" stroke-width="1"/>
+                        <text class="muscle-label" x="40" y="138">Isquios</text>
+                        <text class="muscle-label" x="68" y="138">Isquios</text>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── WEEKLY PROGRESS ────────────── -->
+        <div class="card a5">
+            <div class="chart-header section-header--chart">
+                <span class="section-title">Últimos 7 días</span>
+                <div class="chart-delta-row">
+                    <span class="chart-volume">45,200 kg</span>
+                    <span class="chart-delta positive">+8%</span>
+                </div>
+            </div>
+            <div class="week-chart">
+                <div class="week-bar-wrap">
+                    <div class="week-bar trained bar-h-62"></div>
+                    <span class="week-day">L</span>
+                </div>
+                <div class="week-bar-wrap">
+                    <div class="bar-today-stub"></div>
+                    <span class="week-day today-label">M</span>
+                </div>
+                <div class="week-bar-wrap">
+                    <div class="week-bar trained bar-h-78"></div>
+                    <span class="week-day">X</span>
+                </div>
+                <div class="week-bar-wrap">
+                    <div class="week-bar trained bar-h-100"></div>
+                    <span class="week-day">J</span>
+                </div>
+                <div class="week-bar-wrap">
+                    <div class="week-bar trained bar-h-55"></div>
+                    <span class="week-day">V</span>
+                </div>
+                <div class="week-bar-wrap">
+                    <div class="week-bar rest bar-h-8"></div>
+                    <span class="week-day">S</span>
+                </div>
+                <div class="week-bar-wrap">
+                    <div class="week-bar rest bar-h-8"></div>
+                    <span class="week-day">D</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── STATS MINI GRID ────────────── -->
+        <div class="stats-grid a6">
+            <div class="stat-mini">
+                <span class="stat-mini-value">12</span>
+                <span class="stat-mini-label">Sesiones / mes</span>
+            </div>
+            <div class="stat-mini">
+                <span class="stat-mini-value text-amber">3</span>
+                <span class="stat-mini-label">PRs esta semana</span>
+            </div>
+            <div class="stat-mini">
+                <span class="stat-mini-value text-green">4/5</span>
+                <span class="stat-mini-label">Días activos</span>
+            </div>
+        </div>
+
+        <!-- ── BOTTOM NAV ─────────────────── -->
         <nav class="bottom-nav">
             <a href="dashboard.html" class="nav-item active">
-                <span class="nav-icon">🏠</span>
-                <span>Inicio</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 9.5L12 3l9 6.5V20a1 1 0 01-1 1H4a1 1 0 01-1-1V9.5z"/>
+                    <path d="M9 21V12h6v9"/>
+                </svg>
+                Inicio
             </a>
             <a href="routines.html" class="nav-item">
-                <span class="nav-icon">📋</span>
-                <span>Rutinas</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
+                </svg>
+                Rutinas
             </a>
-            <a href="progression.html" class="nav-item">
-                <span class="nav-icon">📈</span>
-                <span>Logros</span>
+            <a href="history.html" class="nav-item">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9"/>
+                    <path d="M12 7v5l3 3"/>
+                </svg>
+                Historial
             </a>
             <a href="body_metrics.html" class="nav-item">
-                <span class="nav-icon">⚖️</span>
-                <span>Cuerpo</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                </svg>
+                Perfil
             </a>
         </nav>
     </div>
-</body>
 
+    <!-- ── MUSCLE DETAIL BOTTOM SHEET ─────── -->
+    <div class="modal-overlay" id="muscleModal">
+        <div class="modal-sheet">
+            <div class="modal-handle"></div>
+            <div class="modal-muscle-header">
+                <span class="modal-muscle-name" id="modalMuscleName">—</span>
+                <span class="modal-status-badge badge-today" id="modalStatusBadge">Hoy</span>
+            </div>
+            <p class="modal-rest-info" id="modalRestInfo">—</p>
+            <p class="modal-chart-title">Volumen · Últimas 4 semanas</p>
+            <div class="modal-bars" id="modalBars"></div>
+        </div>
+    </div>
+
+    <script>
+        const muscleData = {
+            shoulders:  { name: "Hombros",         status: "recovering", rest: "18h para recuperación completa",               volumes: [65, 72, 68, 55] },
+            chest:      { name: "Pecho",            status: "fatigued",   rest: "Entrena en ~32h — no recomendado hoy",         volumes: [85, 78, 90, 95] },
+            biceps:     { name: "Bíceps",           status: "recovering", rest: "12h para recuperación completa",               volumes: [30, 35, 32, 28] },
+            core:       { name: "Core / Abdomen",   status: "ready",      rest: "Totalmente recuperado — listo para entrenar",  volumes: [20, 25, 22, 30] },
+            quads:      { name: "Cuádriceps",       status: "today",      rest: "Objetivo de hoy — músculos frescos",           volumes: [110, 98, 115, 120] },
+            calves:     { name: "Gemelos",          status: "ready",      rest: "Totalmente recuperado — listo para entrenar",  volumes: [40, 38, 45, 42] },
+            back:       { name: "Espalda",          status: "ready",      rest: "Totalmente recuperado — listo para entrenar",  volumes: [180, 165, 190, 195] },
+            triceps:    { name: "Tríceps",          status: "recovering", rest: "8h para recuperación completa",                volumes: [55, 60, 52, 58] },
+            glutes:     { name: "Glúteos",          status: "today",      rest: "Objetivo de hoy — músculos frescos",           volumes: [95, 88, 100, 105] },
+            hamstrings: { name: "Isquiotibiales",   status: "ready",      rest: "Totalmente recuperado — listo para entrenar",  volumes: [70, 65, 75, 80] }
+        };
+
+        const statusConfig = {
+            ready:      { label: "Listo",     badgeClass: "badge-ready"      },
+            recovering: { label: "Cargando",  badgeClass: "badge-recovering" },
+            fatigued:   { label: "Fatigado",  badgeClass: "badge-fatigued"   },
+            today:      { label: "Hoy",       badgeClass: "badge-today"      }
+        };
+
+        const weekLabels = ["S-3", "S-2", "S-1", "Esta sem."];
+
+        function openMuscleModal(group) {
+            const data = muscleData[group];
+            if (!data) return;
+
+            const cfg = statusConfig[data.status];
+            document.getElementById('modalMuscleName').textContent = data.name;
+
+            const badge = document.getElementById('modalStatusBadge');
+            badge.textContent = cfg.label;
+            badge.className = `modal-status-badge ${cfg.badgeClass}`;
+
+            document.getElementById('modalRestInfo').textContent = data.rest;
+
+            const maxVol = Math.max(...data.volumes);
+            document.getElementById('modalBars').innerHTML = data.volumes.map((vol, i) => `
+                <div class="modal-bar-wrap">
+                    <div class="modal-bar ${i === 3 ? 'current' : 'past'}" style="height:${Math.round((vol / maxVol) * 100)}%"></div>
+                    <span class="modal-bar-label">${weekLabels[i]}</span>
+                </div>
+            `).join('');
+
+            document.getElementById('muscleModal').classList.add('open');
+        }
+
+        document.querySelectorAll('.muscle-zone').forEach(z => {
+            z.addEventListener('click', e => openMuscleModal(e.currentTarget.dataset.group));
+        });
+
+        document.getElementById('muscleModal').addEventListener('click', e => {
+            if (e.target === e.currentTarget) e.currentTarget.classList.remove('open');
+        });
+    </script>
+</body>
 </html>

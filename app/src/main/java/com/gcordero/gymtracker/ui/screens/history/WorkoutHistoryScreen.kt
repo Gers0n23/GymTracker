@@ -26,8 +26,10 @@ import com.gcordero.gymtracker.ui.navigation.SessionHolder
 import com.gcordero.gymtracker.ui.theme.Primary
 import com.gcordero.gymtracker.ui.theme.Secondary
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,7 +66,7 @@ fun WorkoutHistoryScreen(
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.setDateFrom(
-                        datePickerStateFrom.selectedDateMillis?.let { Date(it) }
+                        datePickerStateFrom.selectedDateMillis?.let { utcMidnightToLocalDate(it) }
                     )
                     showDateFromPicker = false
                 }) { Text("OK") }
@@ -83,7 +85,7 @@ fun WorkoutHistoryScreen(
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.setDateTo(
-                        datePickerStateTo.selectedDateMillis?.let { Date(it) }
+                        datePickerStateTo.selectedDateMillis?.let { utcMidnightToLocalDate(it) }
                     )
                     showDateToPicker = false
                 }) { Text("OK") }
@@ -443,4 +445,25 @@ fun InfoChip(label: String, color: Color) {
             fontWeight = FontWeight.Medium
         )
     }
+}
+
+/**
+ * El DatePicker de Material3 devuelve milisegundos en UTC midnight
+ * (ej: 2026-02-23 00:00:00 UTC). Si el dispositivo está en UTC-6,
+ * Date(utcMillis) sería las 18:00 del día anterior.
+ * Esta función convierte los millis UTC al inicio del mismo día calendar
+ * en la timezone local del dispositivo.
+ */
+private fun utcMidnightToLocalDate(utcMillis: Long): Date {
+    val utcCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
+    utcCal.timeInMillis = utcMillis
+    return Calendar.getInstance().apply {
+        set(
+            utcCal[Calendar.YEAR],
+            utcCal[Calendar.MONTH],
+            utcCal[Calendar.DAY_OF_MONTH],
+            0, 0, 0
+        )
+        set(Calendar.MILLISECOND, 0)
+    }.time
 }

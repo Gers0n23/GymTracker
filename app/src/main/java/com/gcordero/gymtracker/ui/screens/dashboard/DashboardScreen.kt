@@ -34,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gcordero.gymtracker.ui.navigation.Screen
-import java.util.Calendar
 
 // ── Local design tokens ───────────────────────────────────────────────────────
 private val Bg           = Color(0xFF0D0D0D)
@@ -50,80 +49,6 @@ private val Txt1         = Color(0xFFF0F0F0)
 private val Txt2         = Color(0xFF888888)
 private val Txt3         = Color(0xFF4A4A4A)
 private val Border       = Color(0x12FFFFFF)
-
-// ── Domain ────────────────────────────────────────────────────────────────────
-enum class MuscleStatus { TODAY, READY, RECOVERING, FATIGUED }
-
-data class MuscleGroup(
-    val id: String,
-    val name: String,
-    val status: MuscleStatus,
-    val restInfo: String,
-    val volumes: List<Int>
-)
-
-enum class TipType { WEIGHT, REPS, SETS }
-data class SmartTip(val exercise: String, val message: String, val type: TipType)
-
-data class TodayWorkout(
-    val dayTag: String,
-    val routineName: String,
-    val exercises: List<String>,
-    val extraCount: Int,
-    val estimatedMinutes: Int
-)
-
-private fun getTodayWorkout(): TodayWorkout? = when (Calendar.getInstance().get(Calendar.DAY_OF_WEEK)) {
-    Calendar.MONDAY    -> TodayWorkout("LUNES · HOY",     "Espalda + Bíceps + Core",          listOf("Jalón al Pecho", "Remo con Barra", "Curl de Bíceps"), 4, 55)
-    Calendar.TUESDAY   -> TodayWorkout("MARTES · HOY",    "Piernas — Cuádriceps + Glúteos",   listOf("Sentadilla", "Prensa", "Extensiones"),                1, 50)
-    Calendar.WEDNESDAY -> TodayWorkout("MIÉRCOLES · HOY", "Cardio + Core Postural",            listOf("Caminata", "Elíptica", "Crunch"),                     6, 60)
-    Calendar.THURSDAY  -> TodayWorkout("JUEVES · HOY",    "Pecho + Tríceps + Hombros + Core", listOf("Press Banca", "Fondos", "Press Militar"),             5, 60)
-    Calendar.FRIDAY    -> TodayWorkout("VIERNES · HOY",   "Piernas — Isquios + Glúteos",       listOf("P. Muerto Rumano", "Curl Femoral", "Hip Thrust"),     2, 50)
-    else               -> null  // Sábado / Domingo — descanso
-}
-
-private val tipsByDay: Map<Int, List<SmartTip>> = mapOf(
-    Calendar.MONDAY to listOf(
-        SmartTip("Jalón al Pecho",     "Sube 2.5 kg — completaste todas las reps al 100% las últimas 3 sesiones",  TipType.WEIGHT),
-        SmartTip("Curl de Bíceps",     "Aumenta a 12 reps — llegaste a 10/10 sin esfuerzo la última sesión",       TipType.REPS),
-        SmartTip("Remo con Barra",     "Añade 1 serie extra — volumen en espalda por debajo del objetivo semanal", TipType.SETS)
-    ),
-    Calendar.TUESDAY to listOf(
-        SmartTip("Sentadilla con Barra",      "Sube 2.5 kg — completaste todas las series al 100% las últimas 3 sesiones",    TipType.WEIGHT),
-        SmartTip("Extensiones de Cuádriceps", "Aumenta a 12 reps — llegaste a 10/10 sin esfuerzo en la última sesión",        TipType.REPS),
-        SmartTip("Prensa de Piernas",         "Añade 1 serie extra — volumen en cuádriceps por debajo del objetivo semanal",  TipType.SETS)
-    ),
-    Calendar.WEDNESDAY to listOf(
-        SmartTip("Crunch Abdominal",    "Aumenta a 15 reps — completaste 12/12 sin esfuerzo la última sesión",    TipType.REPS),
-        SmartTip("Plancha Isométrica",  "Extiende a 45 s — llevas 3 sesiones completando los 30 s sin problema",  TipType.WEIGHT),
-        SmartTip("Elíptica",            "Añade 5 min de intervalo — tu resistencia cardiovascular ha mejorado",   TipType.SETS)
-    ),
-    Calendar.THURSDAY to listOf(
-        SmartTip("Press de Banca",      "Sube 2.5 kg — completaste todas las series al 100% las últimas 3 sesiones", TipType.WEIGHT),
-        SmartTip("Press Militar",       "Aumenta a 10 reps — llegaste a 8/8 en la última sesión",                    TipType.REPS),
-        SmartTip("Fondos en Paralelas", "Añade 1 serie extra — volumen en tríceps por debajo del objetivo semanal",  TipType.SETS)
-    ),
-    Calendar.FRIDAY to listOf(
-        SmartTip("Peso Muerto Rumano",  "Sube 5 kg — completaste todas las series al 100% las últimas 2 sesiones",  TipType.WEIGHT),
-        SmartTip("Hip Thrust",          "Aumenta a 12 reps — llegaste a 10/10 sin esfuerzo la última sesión",       TipType.REPS),
-        SmartTip("Curl Femoral",        "Añade 1 serie extra — volumen en isquios por debajo del objetivo semanal", TipType.SETS)
-    )
-)
-
-// ── Mock data ─────────────────────────────────────────────────────────────────
-private val muscleGroups = mapOf(
-    "shoulders"  to MuscleGroup("shoulders",  "Hombros",        MuscleStatus.RECOVERING, "18h para recuperación completa",       listOf(65, 72, 68, 55)),
-    "chest"      to MuscleGroup("chest",      "Pecho",          MuscleStatus.FATIGUED,   "Entrena en ~32h — no recomendado hoy", listOf(85, 78, 90, 95)),
-    "biceps"     to MuscleGroup("biceps",     "Bíceps",         MuscleStatus.RECOVERING, "12h para recuperación completa",       listOf(30, 35, 32, 28)),
-    "core"       to MuscleGroup("core",       "Core / Abdomen", MuscleStatus.READY,      "Totalmente recuperado",                listOf(20, 25, 22, 30)),
-    "quads"      to MuscleGroup("quads",      "Cuádriceps",     MuscleStatus.TODAY,      "Objetivo de hoy — músculos frescos",   listOf(110, 98, 115, 120)),
-    "calves"     to MuscleGroup("calves",     "Gemelos",        MuscleStatus.READY,      "Totalmente recuperado",                listOf(40, 38, 45, 42)),
-    "back"       to MuscleGroup("back",       "Espalda",        MuscleStatus.READY,      "Totalmente recuperado",                listOf(180, 165, 190, 195)),
-    "triceps"    to MuscleGroup("triceps",    "Tríceps",        MuscleStatus.RECOVERING, "8h para recuperación completa",        listOf(55, 60, 52, 58)),
-    "glutes"     to MuscleGroup("glutes",     "Glúteos",        MuscleStatus.TODAY,      "Objetivo de hoy — músculos frescos",   listOf(95, 88, 100, 105)),
-    "hamstrings" to MuscleGroup("hamstrings", "Isquiotibiales", MuscleStatus.READY,      "Totalmente recuperado",                listOf(70, 65, 75, 80))
-)
-
 
 // Tap zones: cx, cy, rx, ry (in dp), groupId
 private data class TapZone(val cx: Float, val cy: Float, val rx: Float, val ry: Float, val id: String)
@@ -161,8 +86,10 @@ fun DashboardScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val populateState by viewModel.populateState.collectAsState()
+    val uiState by viewModel.uiState.collectAsState()
     val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
     val userId = auth.currentUser?.uid ?: "test_user"
+
     var selectedMuscle by remember { mutableStateOf<MuscleGroup?>(null) }
 
     LaunchedEffect(populateState) {
@@ -210,23 +137,53 @@ fun DashboardScreen(
         },
         containerColor = Bg
     ) { padding ->
-        val todayWorkout = remember { getTodayWorkout() }
-        val todayDow     = remember { Calendar.getInstance().get(Calendar.DAY_OF_WEEK) }
-        val todayTips    = remember { tipsByDay[todayDow] ?: emptyList() }
-
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            item { GreetingRow() }
-            item { HeroWorkoutCard(navController, todayWorkout) }
-            if (todayTips.isNotEmpty()) {
-                item { SmartTipsSection(todayTips) }
+        if (uiState.isLoading) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(color = Indigo)
             }
-            item { MuscleRecoveryCard(onMuscleSelected = { selectedMuscle = it }) }
-            item { WeeklyProgressCard() }
-            item { StatsRow() }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                contentPadding = PaddingValues(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                item {
+                    GreetingRow(
+                        userName = uiState.userName,
+                        greeting = uiState.greeting,
+                        streak   = uiState.streak
+                    )
+                }
+                item { HeroWorkoutCard(navController, uiState.todayWorkout) }
+                if (uiState.smartTips.isNotEmpty()) {
+                    item { SmartTipsSection(uiState.smartTips) }
+                }
+                item {
+                    MuscleRecoveryCard(
+                        muscleGroups      = uiState.muscleGroups,
+                        onMuscleSelected  = { selectedMuscle = it }
+                    )
+                }
+                item {
+                    WeeklyProgressCard(
+                        barHeights      = uiState.weeklyBarHeights,
+                        totalKg         = uiState.weeklyTotalKg,
+                        changePercent   = uiState.weeklyChangePercent,
+                        todayIdx        = uiState.todayIdx
+                    )
+                }
+                item {
+                    StatsRow(
+                        sessionsMonth = uiState.sessionsThisMonth,
+                        prs           = uiState.prsThisWeek,
+                        activeDays    = uiState.activeDaysThisWeek,
+                        activeDaysOf  = uiState.activeDaysTarget
+                    )
+                }
+            }
         }
     }
 
@@ -237,7 +194,7 @@ fun DashboardScreen(
 
 // ── Greeting ──────────────────────────────────────────────────────────────────
 @Composable
-private fun GreetingRow() {
+private fun GreetingRow(userName: String, greeting: String, streak: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -247,20 +204,28 @@ private fun GreetingRow() {
         verticalAlignment = Alignment.Top
     ) {
         Column {
-            Text("Buenos días", fontSize = 13.sp, color = Txt2)
-            Text("Gerson", fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, color = Txt1, letterSpacing = (-0.5).sp)
+            Text(greeting, fontSize = 13.sp, color = Txt2)
+            Text(
+                userName,
+                fontSize = 26.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Txt1,
+                letterSpacing = (-0.5).sp
+            )
         }
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0x14FBBF24))
-                .border(1.dp, Color(0x30FBBF24), RoundedCornerShape(12.dp))
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-        ) {
-            Text("🔥", fontSize = 16.sp)
-            Text("4",    fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Amber)
-            Text("días", fontSize = 9.sp, color = Txt2, letterSpacing = 0.5.sp)
+        if (streak > 0) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0x14FBBF24))
+                    .border(1.dp, Color(0x30FBBF24), RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Text("🔥", fontSize = 16.sp)
+                Text("$streak", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = Amber)
+                Text("días", fontSize = 9.sp, color = Txt2, letterSpacing = 0.5.sp)
+            }
         }
     }
 }
@@ -271,7 +236,6 @@ private fun HeroWorkoutCard(
     navController: androidx.navigation.NavHostController,
     workout: TodayWorkout?
 ) {
-    // Rest day
     if (workout == null) {
         Box(
             modifier = Modifier
@@ -304,7 +268,6 @@ private fun HeroWorkoutCard(
             .border(1.dp, Color(0x48818CF8), RoundedCornerShape(20.dp))
             .padding(18.dp)
     ) {
-        // Glow spot top-right
         Box(
             modifier = Modifier
                 .size(130.dp)
@@ -327,7 +290,7 @@ private fun HeroWorkoutCard(
             Spacer(Modifier.height(5.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("$totalExercises ejercicios", fontSize = 12.sp, color = Txt2)
-                Text("·",                          fontSize = 12.sp, color = Txt2)
+                Text("·", fontSize = 12.sp, color = Txt2)
                 Text("~${workout.estimatedMinutes} min", fontSize = 12.sp, color = Txt2)
             }
             Spacer(Modifier.height(14.dp))
@@ -411,7 +374,10 @@ private fun SmartTipCard(tip: SmartTip) {
 
 // ── Muscle recovery card ──────────────────────────────────────────────────────
 @Composable
-private fun MuscleRecoveryCard(onMuscleSelected: (MuscleGroup) -> Unit) {
+private fun MuscleRecoveryCard(
+    muscleGroups: Map<String, MuscleGroup>,
+    onMuscleSelected: (MuscleGroup) -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -429,7 +395,6 @@ private fun MuscleRecoveryCard(onMuscleSelected: (MuscleGroup) -> Unit) {
             Text("RECUPERACIÓN MUSCULAR", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Txt2, letterSpacing = 0.8.sp)
             Text("Toca un grupo", fontSize = 10.sp, color = Txt3)
         }
-        // Legend
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             listOf("Hoy" to Indigo, "Listo" to Green, "Cargando" to Amber, "Fatigado" to Red).forEach { (label, color) ->
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -439,7 +404,6 @@ private fun MuscleRecoveryCard(onMuscleSelected: (MuscleGroup) -> Unit) {
             }
         }
         Spacer(Modifier.height(14.dp))
-        // Front + Back side by side
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -448,13 +412,23 @@ private fun MuscleRecoveryCard(onMuscleSelected: (MuscleGroup) -> Unit) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Frontal",   fontSize = 9.sp, color = Txt3, letterSpacing = 0.8.sp)
                 Spacer(Modifier.height(6.dp))
-                BodyCanvas(tapZones = frontTapZones, drawZones = { drawFrontZones() }, onMuscleSelected = onMuscleSelected)
+                BodyCanvas(
+                    tapZones         = frontTapZones,
+                    drawZones        = { drawFrontZones(muscleGroups) },
+                    muscleGroups     = muscleGroups,
+                    onMuscleSelected = onMuscleSelected
+                )
             }
             Spacer(Modifier.width(20.dp))
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Posterior", fontSize = 9.sp, color = Txt3, letterSpacing = 0.8.sp)
                 Spacer(Modifier.height(6.dp))
-                BodyCanvas(tapZones = backTapZones, drawZones = { drawBackZones() }, onMuscleSelected = onMuscleSelected)
+                BodyCanvas(
+                    tapZones         = backTapZones,
+                    drawZones        = { drawBackZones(muscleGroups) },
+                    muscleGroups     = muscleGroups,
+                    onMuscleSelected = onMuscleSelected
+                )
             }
         }
     }
@@ -464,6 +438,7 @@ private fun MuscleRecoveryCard(onMuscleSelected: (MuscleGroup) -> Unit) {
 private fun BodyCanvas(
     tapZones: List<TapZone>,
     drawZones: DrawScope.() -> Unit,
+    muscleGroups: Map<String, MuscleGroup>,
     onMuscleSelected: (MuscleGroup) -> Unit
 ) {
     Canvas(
@@ -492,10 +467,13 @@ private fun BodyCanvas(
 
 // ── Weekly progress ───────────────────────────────────────────────────────────
 @Composable
-private fun WeeklyProgressCard() {
-    val days      = listOf("L", "M", "X", "J", "V", "S", "D")
-    val heights   = listOf(0.62f, 0f, 0.78f, 1.0f, 0.55f, 0.08f, 0.08f)
-    val todayIdx  = 1
+private fun WeeklyProgressCard(
+    barHeights: List<Float>,
+    totalKg: Double,
+    changePercent: Double?,
+    todayIdx: Int
+) {
+    val days = listOf("L", "M", "X", "J", "V", "S", "D")
 
     Column(
         modifier = Modifier
@@ -513,28 +491,32 @@ private fun WeeklyProgressCard() {
         ) {
             Text("ÚLTIMOS 7 DÍAS", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Txt2, letterSpacing = 0.8.sp)
             Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("45,200 kg", fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Txt1)
-                Text("+8%", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Green)
+                val totalFormatted = if (totalKg >= 1000) "${"%.1f".format(totalKg / 1000)} t"
+                                     else "${totalKg.toInt()} kg"
+                Text(totalFormatted, fontSize = 20.sp, fontWeight = FontWeight.Bold, color = Txt1)
+                if (changePercent != null) {
+                    val sign  = if (changePercent >= 0) "+" else ""
+                    val color = if (changePercent >= 0) Green else Red
+                    Text("$sign${"%.0f".format(changePercent)}%", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = color)
+                }
             }
         }
-        // Bars via Canvas
         Canvas(modifier = Modifier.fillMaxWidth().height(72.dp)) {
-            val gap      = 5.dp.toPx()
-            val barW     = (size.width - gap * 6) / 7f
-            heights.forEachIndexed { i, frac ->
+            val gap  = 5.dp.toPx()
+            val barW = (size.width - gap * 6) / 7f
+            barHeights.forEachIndexed { i, frac ->
                 val x     = i * (barW + gap)
                 val color = when {
                     i == todayIdx -> Indigo.copy(alpha = 0.38f)
                     frac > 0.1f  -> Indigo.copy(alpha = 0.55f)
                     else         -> CardSurface2
                 }
-                val barH  = if (i == todayIdx) 4.dp.toPx() else (size.height * frac)
-                val y     = size.height - barH
+                val barH = if (i == todayIdx && frac == 0f) 4.dp.toPx() else (size.height * frac)
+                val y    = size.height - barH
                 drawRoundRect(color, topLeft = Offset(x, y), size = Size(barW, barH), cornerRadius = CornerRadius(4.dp.toPx()))
             }
         }
         Spacer(Modifier.height(8.dp))
-        // Day labels
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
             days.forEachIndexed { i, d ->
                 Text(
@@ -550,15 +532,20 @@ private fun WeeklyProgressCard() {
 
 // ── Stats row ─────────────────────────────────────────────────────────────────
 @Composable
-private fun StatsRow() {
+private fun StatsRow(
+    sessionsMonth: Int,
+    prs: Int,
+    activeDays: Int,
+    activeDaysOf: Int
+) {
     Row(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         listOf(
-            Triple("12",  "Sesiones\n/ mes",    Txt1),
-            Triple("3",   "PRs esta\nsemana",   Amber),
-            Triple("4/5", "Días\nactivos",      Green)
+            Triple("$sessionsMonth",         "Sesiones\n/ mes",   Txt1),
+            Triple("$prs",                   "PRs esta\nsemana",  Amber),
+            Triple("$activeDays/$activeDaysOf", "Días\nactivos",  Green)
         ).forEach { (value, label, color) ->
             Column(
                 modifier = Modifier
@@ -620,7 +607,7 @@ private fun MuscleDetailBottomSheet(muscle: MuscleGroup, onDismiss: () -> Unit) 
 
 @Composable
 private fun MiniVolumeChart(volumes: List<Int>) {
-    val max    = volumes.max().toFloat()
+    val max    = volumes.maxOrNull()?.takeIf { it > 0 }?.toFloat() ?: 1f
     val labels = listOf("S-3", "S-2", "S-1", "Esta sem.")
     Row(
         modifier = Modifier.fillMaxWidth().height(80.dp),
@@ -658,28 +645,20 @@ private fun DrawScope.drawBodySilhouette() {
     val sw     = 1.dp.toPx()
     val cr3    = CornerRadius(3.dp.toPx())
 
-    // Head
     drawCircle(fill,   radius = 13.dp.toPx(), center = Offset(54.dp.toPx(), 17.dp.toPx()))
     drawCircle(stroke, radius = 13.dp.toPx(), center = Offset(54.dp.toPx(), 17.dp.toPx()), style = Stroke(sw))
-    // Neck
     drawRoundRect(fill,   Offset(48.dp.toPx(), 29.dp.toPx()), Size(12.dp.toPx(), 10.dp.toPx()), cr3)
     drawRoundRect(stroke, Offset(48.dp.toPx(), 29.dp.toPx()), Size(12.dp.toPx(), 10.dp.toPx()), cr3, style = Stroke(sw))
-    // Torso
     drawRoundRect(fill,   Offset(30.dp.toPx(), 39.dp.toPx()), Size(48.dp.toPx(), 56.dp.toPx()), CornerRadius(6.dp.toPx()))
     drawRoundRect(stroke, Offset(30.dp.toPx(), 39.dp.toPx()), Size(48.dp.toPx(), 56.dp.toPx()), CornerRadius(6.dp.toPx()), style = Stroke(sw))
-    // Left arm
     drawRoundRect(fill,   Offset(15.dp.toPx(), 39.dp.toPx()), Size(14.dp.toPx(), 58.dp.toPx()), CornerRadius(7.dp.toPx()))
     drawRoundRect(stroke, Offset(15.dp.toPx(), 39.dp.toPx()), Size(14.dp.toPx(), 58.dp.toPx()), CornerRadius(7.dp.toPx()), style = Stroke(sw))
-    // Right arm
     drawRoundRect(fill,   Offset(79.dp.toPx(), 39.dp.toPx()), Size(14.dp.toPx(), 58.dp.toPx()), CornerRadius(7.dp.toPx()))
     drawRoundRect(stroke, Offset(79.dp.toPx(), 39.dp.toPx()), Size(14.dp.toPx(), 58.dp.toPx()), CornerRadius(7.dp.toPx()), style = Stroke(sw))
-    // Pelvis
     drawRoundRect(fill,   Offset(31.dp.toPx(), 93.dp.toPx()),  Size(46.dp.toPx(), 16.dp.toPx()), CornerRadius(5.dp.toPx()))
     drawRoundRect(stroke, Offset(31.dp.toPx(), 93.dp.toPx()),  Size(46.dp.toPx(), 16.dp.toPx()), CornerRadius(5.dp.toPx()), style = Stroke(sw))
-    // Left leg
     drawRoundRect(fill,   Offset(31.dp.toPx(), 107.dp.toPx()), Size(18.dp.toPx(), 75.dp.toPx()), CornerRadius(8.dp.toPx()))
     drawRoundRect(stroke, Offset(31.dp.toPx(), 107.dp.toPx()), Size(18.dp.toPx(), 75.dp.toPx()), CornerRadius(8.dp.toPx()), style = Stroke(sw))
-    // Right leg
     drawRoundRect(fill,   Offset(59.dp.toPx(), 107.dp.toPx()), Size(18.dp.toPx(), 75.dp.toPx()), CornerRadius(8.dp.toPx()))
     drawRoundRect(stroke, Offset(59.dp.toPx(), 107.dp.toPx()), Size(18.dp.toPx(), 75.dp.toPx()), CornerRadius(8.dp.toPx()), style = Stroke(sw))
 }
@@ -699,33 +678,35 @@ private fun DrawScope.drawMuscleRect(x: Float, y: Float, w: Float, h: Float, col
     drawRoundRect(color.copy(alpha = 0.28f), tl, sz, cr, style = Stroke(1.dp.toPx()))
 }
 
-private fun statusColor(s: MuscleStatus): Color = when (s) {
-    MuscleStatus.TODAY      -> Indigo
-    MuscleStatus.READY      -> Green
-    MuscleStatus.RECOVERING -> Amber
-    MuscleStatus.FATIGUED   -> Red
+private fun statusColor(groups: Map<String, MuscleGroup>, id: String): Color {
+    return when (groups[id]?.status ?: MuscleStatus.READY) {
+        MuscleStatus.TODAY      -> Indigo
+        MuscleStatus.READY      -> Green
+        MuscleStatus.RECOVERING -> Amber
+        MuscleStatus.FATIGUED   -> Red
+    }
 }
 
-private fun DrawScope.drawFrontZones() {
-    drawMuscleOval(25f, 46f, 11f, 9f,  statusColor(MuscleStatus.RECOVERING))  // shoulder L
-    drawMuscleOval(83f, 46f, 11f, 9f,  statusColor(MuscleStatus.RECOVERING))  // shoulder R
-    drawMuscleOval(45f, 57f, 13f, 11f, statusColor(MuscleStatus.FATIGUED))    // chest L
-    drawMuscleOval(63f, 57f, 13f, 11f, statusColor(MuscleStatus.FATIGUED))    // chest R
-    drawMuscleRect(15f, 53f, 11f, 26f, statusColor(MuscleStatus.RECOVERING))  // biceps L
-    drawMuscleRect(82f, 53f, 11f, 26f, statusColor(MuscleStatus.RECOVERING))  // biceps R
-    drawMuscleRect(40f, 71f, 28f, 21f, statusColor(MuscleStatus.READY))       // core
-    drawMuscleRect(32f, 109f, 16f, 46f, statusColor(MuscleStatus.TODAY))      // quads L
-    drawMuscleRect(60f, 109f, 16f, 46f, statusColor(MuscleStatus.TODAY))      // quads R
-    drawMuscleRect(32f, 158f, 14f, 28f, statusColor(MuscleStatus.READY))      // calves L
-    drawMuscleRect(62f, 158f, 14f, 28f, statusColor(MuscleStatus.READY))      // calves R
+private fun DrawScope.drawFrontZones(groups: Map<String, MuscleGroup>) {
+    drawMuscleOval(25f, 46f, 11f, 9f,  statusColor(groups, "shoulders"))
+    drawMuscleOval(83f, 46f, 11f, 9f,  statusColor(groups, "shoulders"))
+    drawMuscleOval(45f, 57f, 13f, 11f, statusColor(groups, "chest"))
+    drawMuscleOval(63f, 57f, 13f, 11f, statusColor(groups, "chest"))
+    drawMuscleRect(15f, 53f, 11f, 26f, statusColor(groups, "biceps"))
+    drawMuscleRect(82f, 53f, 11f, 26f, statusColor(groups, "biceps"))
+    drawMuscleRect(40f, 71f, 28f, 21f, statusColor(groups, "core"))
+    drawMuscleRect(32f, 109f, 16f, 46f, statusColor(groups, "quads"))
+    drawMuscleRect(60f, 109f, 16f, 46f, statusColor(groups, "quads"))
+    drawMuscleRect(32f, 158f, 14f, 28f, statusColor(groups, "calves"))
+    drawMuscleRect(62f, 158f, 14f, 28f, statusColor(groups, "calves"))
 }
 
-private fun DrawScope.drawBackZones() {
-    drawMuscleOval(54f, 58f, 22f, 19f, statusColor(MuscleStatus.READY))       // back
-    drawMuscleRect(15f, 53f, 11f, 26f, statusColor(MuscleStatus.RECOVERING))  // triceps L
-    drawMuscleRect(82f, 53f, 11f, 26f, statusColor(MuscleStatus.RECOVERING))  // triceps R
-    drawMuscleOval(43f, 104f, 11f, 10f, statusColor(MuscleStatus.TODAY))      // glutes L
-    drawMuscleOval(65f, 104f, 11f, 10f, statusColor(MuscleStatus.TODAY))      // glutes R
-    drawMuscleRect(32f, 116f, 16f, 42f, statusColor(MuscleStatus.READY))      // hamstrings L
-    drawMuscleRect(60f, 116f, 16f, 42f, statusColor(MuscleStatus.READY))      // hamstrings R
+private fun DrawScope.drawBackZones(groups: Map<String, MuscleGroup>) {
+    drawMuscleOval(54f, 58f, 22f, 19f,  statusColor(groups, "back"))
+    drawMuscleRect(15f, 53f, 11f, 26f,  statusColor(groups, "triceps"))
+    drawMuscleRect(82f, 53f, 11f, 26f,  statusColor(groups, "triceps"))
+    drawMuscleOval(43f, 104f, 11f, 10f, statusColor(groups, "glutes"))
+    drawMuscleOval(65f, 104f, 11f, 10f, statusColor(groups, "glutes"))
+    drawMuscleRect(32f, 116f, 16f, 42f, statusColor(groups, "hamstrings"))
+    drawMuscleRect(60f, 116f, 16f, 42f, statusColor(groups, "hamstrings"))
 }

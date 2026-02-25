@@ -22,9 +22,21 @@ data class SetRecord(
     val exerciseId: String = "",
     val exerciseName: String = "",
     val setNumber: Int = 1,
+    // STRENGTH
     val weight: Double = 0.0,
     val reps: Int = 0,
     val rir: Int? = null, // Reps In Reserve
+    // TIMED (plancha, isométricos)
+    val durationSeconds: Int? = null,
+    // CARDIO (trotadora, elíptica)
+    val speedKmh: Double? = null,
+    val inclinePercent: Double? = null,
     val isPersonalBest: Boolean = false,
     val timestamp: Timestamp = Timestamp.now()
-)
+) {
+    /** Distancia estimada en km (solo para CARDIO). */
+    val distanceKm: Double?
+        get() = if (speedKmh != null && durationSeconds != null)
+            speedKmh * (durationSeconds / 3600.0)
+        else null
+}

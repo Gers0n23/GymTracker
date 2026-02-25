@@ -72,6 +72,9 @@ fun NavGraph(
                     navController.navigate("session_summary") {
                         popUpTo(Screen.Dashboard.route)
                     }
+                },
+                onAbandon = {
+                    navController.popBackStack()
                 }
             )
         }

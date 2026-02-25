@@ -22,6 +22,7 @@ data class SmartTip(
 
 // ── Hero card ─────────────────────────────────────────────────────────────────
 data class TodayWorkout(
+    val routineId: String,
     val dayTag: String,
     val routineName: String,
     val exercises: List<String>,

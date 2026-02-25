@@ -418,6 +418,7 @@ class DashboardViewModel(
         val estimatedMin = (exercises.size * 7).coerceAtLeast(30)
 
         return TodayWorkout(
+            routineId        = routine.id,
             dayTag           = dayTag,
             routineName      = routine.name,
             exercises        = shown,

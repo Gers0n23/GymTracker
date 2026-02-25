@@ -36,12 +36,13 @@ class RoutinesViewModel(
         }
     }
 
-    fun addRoutine(name: String, description: String) {
+    fun addRoutine(name: String, description: String, muscleGroups: List<String> = emptyList()) {
         val userId = auth.currentUser?.uid ?: "test_user"
         val newRoutine = Routine(
             userId = userId,
             name = name,
-            description = description
+            description = description,
+            muscleGroups = muscleGroups
         )
         viewModelScope.launch {
             repository.addRoutine(newRoutine)

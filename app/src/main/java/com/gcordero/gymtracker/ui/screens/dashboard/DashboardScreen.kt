@@ -312,7 +312,7 @@ private fun HeroWorkoutCard(
             }
             Spacer(Modifier.height(16.dp))
             Button(
-                onClick = { navController.navigate(Screen.Routines.route) },
+                onClick = { navController.navigate(Screen.ActiveSession.createRoute(workout.routineId)) },
                 modifier = Modifier.fillMaxWidth().height(46.dp),
                 shape = RoundedCornerShape(13.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Indigo)

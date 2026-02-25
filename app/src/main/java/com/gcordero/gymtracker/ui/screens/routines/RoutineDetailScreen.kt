@@ -3,7 +3,8 @@ package com.gcordero.gymtracker.ui.screens.routines
 import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -16,6 +17,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.platform.LocalContext
@@ -24,8 +26,10 @@ import android.net.Uri
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import com.gcordero.gymtracker.domain.model.Exercise
+import com.gcordero.gymtracker.domain.model.ExerciseType
 import com.gcordero.gymtracker.ui.components.GlassCard
 import com.gcordero.gymtracker.ui.theme.Primary
+import com.gcordero.gymtracker.ui.theme.PrimaryDim
 
 private fun dayLabel(days: List<Int>): String {
     val name = when (days.firstOrNull()) {
@@ -95,6 +99,9 @@ fun RoutineDetailScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { showAddExerciseDialog = true }) {
+                        Icon(Icons.Default.Add, contentDescription = "Añadir Ejercicio", tint = Primary)
+                    }
                     Box {
                         IconButton(onClick = { showHeaderMenu = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = "Opciones", tint = Primary)
@@ -125,33 +132,26 @@ fun RoutineDetailScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)
             )
         },
-        floatingActionButton = {
-            FloatingActionButton(
-                onClick = { showAddExerciseDialog = true },
-                containerColor = Primary,
-                contentColor = Color.Black
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Añadir Ejercicio")
-            }
-        },
         bottomBar = {
             if (exercises.isNotEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp)
+                        .background(MaterialTheme.colorScheme.background)
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
                 ) {
                     Button(
                         onClick = { onStartWorkout(routineId) },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp),
+                            .height(52.dp),
                         colors = ButtonDefaults.buttonColors(containerColor = Primary),
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
+                        shape = RoundedCornerShape(14.dp),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp)
                     ) {
                         Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black)
                         Spacer(Modifier.width(8.dp))
-                        Text("EMPEZAR ENTRENAMIENTO", fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text("EMPEZAR ENTRENAMIENTO", fontWeight = FontWeight.Bold, color = Color.Black, fontSize = 14.sp)
                     }
                 }
             }
@@ -175,12 +175,13 @@ fun RoutineDetailScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp, 16.dp, 16.dp, 80.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(exercises) { exercise ->
+                    itemsIndexed(exercises) { index, exercise ->
                         ExerciseItem(
                             exercise = exercise,
+                            index = index,
                             onEdit = { exerciseToEdit = it },
                             onDelete = { viewModel.deleteExercise(it.id) }
                         )
@@ -193,8 +194,8 @@ fun RoutineDetailScreen(
     if (showAddExerciseDialog) {
         AddExerciseDialog(
             onDismiss = { showAddExerciseDialog = false },
-            onConfirm = { name, muscle, media, targetSets ->
-                viewModel.addExercise(routineId, name, muscle, media, targetSets)
+            onConfirm = { name, muscle, media, targetSets, exerciseType ->
+                viewModel.addExercise(routineId, name, muscle, media, targetSets, exerciseType)
                 showAddExerciseDialog = false
             }
         )
@@ -249,6 +250,7 @@ fun RoutineDetailScreen(
 @Composable
 private fun ExerciseItem(
     exercise: Exercise,
+    index: Int,
     onEdit: (Exercise) -> Unit,
     onDelete: (Exercise) -> Unit
 ) {
@@ -257,70 +259,147 @@ private fun ExerciseItem(
 
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
+        padding = 14.dp,
+        containerColor = Color(0xFF16162A),
+        borderColor = Primary.copy(alpha = 0.22f),
         onClick = { expanded = !expanded }
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
+        Column {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Icon(
-                        if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = null,
-                        tint = Color.Gray,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Column {
+                // Badge numérico de orden
+                Surface(
+                    color = PrimaryDim,
+                    shape = CircleShape,
+                    modifier = Modifier.size(30.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                         Text(
-                            text = exercise.name,
-                            fontSize = 18.sp,
+                            text = "${index + 1}",
+                            fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = exercise.muscleGroup,
-                            fontSize = 14.sp,
                             color = Primary
                         )
                     }
                 }
-                Box {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Opciones", tint = Color.Gray)
+
+                Spacer(Modifier.width(10.dp))
+
+                // Nombre + grupo muscular + tipo
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    Text(
+                        text = exercise.name,
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 2,
+                        lineHeight = 19.sp
+                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (exercise.muscleGroup.isNotEmpty()) {
+                            Text(
+                                text = exercise.muscleGroup,
+                                fontSize = 12.sp,
+                                color = Color(0xFFAAAAAA)
+                            )
+                        }
+                        val (typeLabel, typeColor) = when (exercise.type) {
+                            ExerciseType.TIMED -> "⏱ Tiempo" to Color(0xFFFFB300)
+                            ExerciseType.CARDIO -> "🏃 Cardio" to Color(0xFF42A5F5)
+                            ExerciseType.STRENGTH -> null to null
+                        }
+                        if (typeLabel != null && typeColor != null) {
+                            Surface(
+                                color = typeColor.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(5.dp)
+                            ) {
+                                Text(
+                                    text = typeLabel,
+                                    fontSize = 9.sp,
+                                    color = typeColor,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
                     }
-                    DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Editar") },
-                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                            onClick = {
-                                showMenu = false
-                                onEdit(exercise)
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Eliminar", color = Color.Red) },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) },
-                            onClick = {
-                                showMenu = false
-                                onDelete(exercise)
-                            }
-                        )
+                }
+
+                Spacer(Modifier.width(6.dp))
+
+                // Derecha: badge de series + flecha expand + menú
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    if (exercise.targetSets > 0 && exercise.type != ExerciseType.CARDIO) {
+                        Surface(
+                            color = Color.White.copy(alpha = 0.07f),
+                            shape = RoundedCornerShape(7.dp)
+                        ) {
+                            Text(
+                                text = "${exercise.targetSets}×",
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF888888)
+                            )
+                        }
+                    }
+                    Icon(
+                        if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = null,
+                        tint = Color(0xFF555555),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Box {
+                        IconButton(
+                            onClick = { showMenu = true },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "Opciones",
+                                tint = Color(0xFF666666),
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Editar") },
+                                leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },
+                                onClick = { showMenu = false; onEdit(exercise) }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Eliminar", color = Color.Red) },
+                                leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) },
+                                onClick = { showMenu = false; onDelete(exercise) }
+                            )
+                        }
                     }
                 }
             }
 
+            // Contenido expandible
             AnimatedVisibility(visible = expanded) {
                 Column {
                     if (exercise.notes.isNotEmpty()) {
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(10.dp))
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.06f))
+                        Spacer(Modifier.height(10.dp))
                         Text(
                             text = exercise.notes,
-                            fontSize = 13.sp,
-                            color = Color.Gray,
-                            lineHeight = 18.sp
+                            fontSize = 12.sp,
+                            color = Color(0xFFAAAAAA),
+                            lineHeight = 17.sp
                         )
                     }
 
@@ -333,21 +412,20 @@ private fun ExerciseItem(
                             exercise.mediaUrl
                         }
 
-                        Spacer(Modifier.height(16.dp))
-                        // Visualizador de Multimedia (Clickable)
+                        Spacer(Modifier.height(14.dp))
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(180.dp)
-                                .clickable { 
+                                .height(170.dp)
+                                .clickable {
                                     try {
                                         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(exercise.mediaUrl))
                                         context.startActivity(intent)
                                     } catch (e: Exception) {
-                                        // Manejar error si la URL es inválida
+                                        // URL inválida
                                     }
                                 },
-                            shape = RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(10.dp),
                             color = Color.White.copy(alpha = 0.05f)
                         ) {
                             Box {
@@ -357,7 +435,6 @@ private fun ExerciseItem(
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
                                 )
-                                // Overlay con icono de Play
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
@@ -366,12 +443,12 @@ private fun ExerciseItem(
                                 ) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                         Icon(
-                                            Icons.Default.PlayArrow, 
-                                            contentDescription = "Reproducir", 
-                                            tint = Primary, 
-                                            modifier = Modifier.size(56.dp)
+                                            Icons.Default.PlayArrow,
+                                            contentDescription = "Reproducir",
+                                            tint = Primary,
+                                            modifier = Modifier.size(48.dp)
                                         )
-                                        Text("Toca para reproducir", fontSize = 12.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        Text("Toca para reproducir", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
                                     }
                                 }
                             }
@@ -400,12 +477,13 @@ private fun getYoutubeVideoId(url: String): String? {
 @Composable
 private fun AddExerciseDialog(
     onDismiss: () -> Unit,
-    onConfirm: (String, String, String, Int) -> Unit
+    onConfirm: (String, String, String, Int, String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var muscle by remember { mutableStateOf("") }
     var mediaUrl by remember { mutableStateOf("") }
     var targetSets by remember { mutableIntStateOf(3) }
+    var selectedType by remember { mutableStateOf(ExerciseType.STRENGTH) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -434,32 +512,30 @@ private fun AddExerciseDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Primary, focusedLabelColor = Primary)
                 )
-                // Series objetivo picker
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Series objetivo", fontSize = 14.sp)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = { if (targetSets > 1) targetSets-- },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Text("−", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Text(
-                            "$targetSets",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.width(32.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                        IconButton(
-                            onClick = { if (targetSets < 8) targetSets++ },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Más series")
+                // Selector de tipo de ejercicio
+                ExerciseTypeSelector(selectedType = selectedType, onTypeSelected = { selectedType = it })
+                // Series objetivo (oculto para CARDIO, que siempre es 1 sesión)
+                if (selectedType != ExerciseType.CARDIO) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Series objetivo", fontSize = 14.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { if (targetSets > 1) targetSets-- }, modifier = Modifier.size(36.dp)) {
+                                Text("−", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                "$targetSets",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.width(32.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            IconButton(onClick = { if (targetSets < 8) targetSets++ }, modifier = Modifier.size(36.dp)) {
+                                Icon(Icons.Default.Add, contentDescription = "Más series")
+                            }
                         }
                     }
                 }
@@ -467,18 +543,65 @@ private fun AddExerciseDialog(
         },
         confirmButton = {
             Button(
-                onClick = { if (name.isNotBlank()) onConfirm(name, muscle, mediaUrl, targetSets) },
+                onClick = {
+                    if (name.isNotBlank()) {
+                        val sets = if (selectedType == ExerciseType.CARDIO) 1 else targetSets
+                        onConfirm(name, muscle, mediaUrl, sets, selectedType.name)
+                    }
+                },
                 colors = ButtonDefaults.buttonColors(containerColor = Primary)
             ) {
                 Text("Añadir", color = Color.Black)
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar")
-            }
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
         }
     )
+}
+
+@Composable
+private fun ExerciseTypeSelector(
+    selectedType: ExerciseType,
+    onTypeSelected: (ExerciseType) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("Tipo de ejercicio", fontSize = 14.sp, color = Color.Gray)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(
+                ExerciseType.STRENGTH to "💪 Fuerza",
+                ExerciseType.TIMED to "⏱ Tiempo",
+                ExerciseType.CARDIO to "🏃 Cardio"
+            ).forEach { (type, label) ->
+                val isSelected = selectedType == type
+                val color = when (type) {
+                    ExerciseType.STRENGTH -> Primary
+                    ExerciseType.TIMED -> Color(0xFFFFB300)
+                    ExerciseType.CARDIO -> Color(0xFF42A5F5)
+                }
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable { onTypeSelected(type) },
+                    color = if (isSelected) color.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(
+                        width = if (isSelected) 1.5.dp else 1.dp,
+                        color = if (isSelected) color else Color.White.copy(alpha = 0.15f)
+                    )
+                ) {
+                    Text(
+                        text = label,
+                        modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                        fontSize = 11.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) color else Color.White.copy(alpha = 0.5f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -540,6 +663,7 @@ private fun EditExerciseDialog(
     var notes by remember { mutableStateOf(exercise.notes) }
     var mediaUrl by remember { mutableStateOf(exercise.mediaUrl) }
     var targetSets by remember { mutableIntStateOf(exercise.targetSets.coerceAtLeast(1)) }
+    var selectedType by remember { mutableStateOf(exercise.type) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -574,32 +698,28 @@ private fun EditExerciseDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Primary, focusedLabelColor = Primary)
                 )
-                // Series objetivo picker
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Series objetivo", fontSize = 14.sp)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(
-                            onClick = { if (targetSets > 1) targetSets-- },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Text("−", fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                        }
-                        Text(
-                            "$targetSets",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.width(32.dp),
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                        )
-                        IconButton(
-                            onClick = { if (targetSets < 8) targetSets++ },
-                            modifier = Modifier.size(36.dp)
-                        ) {
-                            Icon(Icons.Default.Add, contentDescription = "Más series")
+                ExerciseTypeSelector(selectedType = selectedType, onTypeSelected = { selectedType = it })
+                if (selectedType != ExerciseType.CARDIO) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Series objetivo", fontSize = 14.sp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(onClick = { if (targetSets > 1) targetSets-- }, modifier = Modifier.size(36.dp)) {
+                                Text("−", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                "$targetSets",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.width(32.dp),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            IconButton(onClick = { if (targetSets < 8) targetSets++ }, modifier = Modifier.size(36.dp)) {
+                                Icon(Icons.Default.Add, contentDescription = "Más series")
+                            }
                         }
                     }
                 }
@@ -609,7 +729,15 @@ private fun EditExerciseDialog(
             Button(
                 onClick = {
                     if (name.isNotBlank()) {
-                        onConfirm(exercise.copy(name = name, muscleGroup = muscle, notes = notes, mediaUrl = mediaUrl, targetSets = targetSets))
+                        val sets = if (selectedType == ExerciseType.CARDIO) 1 else targetSets
+                        onConfirm(exercise.copy(
+                            name = name,
+                            muscleGroup = muscle,
+                            notes = notes,
+                            mediaUrl = mediaUrl,
+                            targetSets = sets,
+                            exerciseType = selectedType.name
+                        ))
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Primary)
@@ -618,9 +746,7 @@ private fun EditExerciseDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancelar")
-            }
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
         }
     )
 }

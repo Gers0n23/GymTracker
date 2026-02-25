@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gcordero.gymtracker.domain.model.Exercise
+import com.gcordero.gymtracker.domain.model.ExerciseType
 import com.gcordero.gymtracker.domain.model.SetRecord
 import com.gcordero.gymtracker.ui.components.GlassCard
 import com.gcordero.gymtracker.ui.theme.Glass
@@ -63,6 +65,7 @@ fun TimerBadge(seconds: Int) {
 fun ActiveSessionScreen(
     routineId: String,
     onFinish: () -> Unit,
+    onAbandon: () -> Unit = {},
     viewModel: ActiveSessionViewModel = viewModel(factory = ActiveSessionViewModel.Factory)
 ) {
     val exercises by viewModel.exercises.collectAsState()
@@ -76,10 +79,49 @@ fun ActiveSessionScreen(
     val isSessionSaved by viewModel.isSessionSaved.collectAsState()
     val restNextAction by viewModel.restNextAction.collectAsState()
     val restMessage by viewModel.restMessage.collectAsState()
+    val isDraftRestored by viewModel.isDraftRestored.collectAsState()
 
     val currentExercise = exercises.getOrNull(currentIndex)
     val currentExerciseSets = currentExercise?.let { sets[it.id] } ?: emptyList()
     val currentSet = currentExerciseSets.getOrNull(currentSetNum - 1)
+
+    // Diálogo de confirmación al presionar Atrás
+    var showAbandonDialog by remember { mutableStateOf(false) }
+
+    BackHandler(enabled = !isSessionSaved) {
+        showAbandonDialog = true
+    }
+
+    if (showAbandonDialog) {
+        AlertDialog(
+            onDismissRequest = { showAbandonDialog = false },
+            title = { Text("¿Abandonar entrenamiento?", color = Color.White) },
+            text = {
+                Text(
+                    "Si salís ahora, el entrenamiento no se guardará.",
+                    color = Color.White.copy(alpha = 0.7f)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showAbandonDialog = false
+                        viewModel.abandonSession()
+                        onAbandon()
+                    }
+                ) {
+                    Text("Abandonar", color = Color(0xFFCF6679), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAbandonDialog = false }) {
+                    Text("Continuar entrenamiento", color = Primary)
+                }
+            },
+            containerColor = Color(0xFF1E1E2E),
+            tonalElevation = 0.dp
+        )
+    }
 
     // Solicitar permiso de notificaciones (Android 13+)
     val notifPermissionLauncher = rememberLauncherForActivityResult(
@@ -189,8 +231,14 @@ fun ActiveSessionScreen(
                         previousSetRecord = previousSetRecord,
                         isLastExercise = isLastExercise,
                         modifier = Modifier.weight(1f),
-                        onUpdateSet = { weight, reps, rir ->
+                        onUpdateStrengthSet = { weight, reps, rir ->
                             viewModel.updateSet(currentExercise.id, currentSetNum - 1, weight, reps, rir)
+                        },
+                        onUpdateTimedSet = { durationSeconds ->
+                            viewModel.updateTimedSet(currentExercise.id, currentSetNum - 1, durationSeconds)
+                        },
+                        onUpdateCardioSet = { speedKmh, inclinePercent, durationSeconds ->
+                            viewModel.updateCardioSet(currentExercise.id, currentSetNum - 1, speedKmh, inclinePercent, durationSeconds)
                         },
                         onReady = { viewModel.startRestTimer() },
                         onFinishExercise = { viewModel.nextExercise() },
@@ -206,7 +254,11 @@ fun ActiveSessionScreen(
             RestOverlay(
                 secondsLeft = restTimer,
                 onSkip = { viewModel.skipRest() },
-                nextSetInfo = "Serie ${currentSetNum + 1} • ${currentSet?.weight ?: 0}kg",
+                nextSetInfo = when (currentExercise?.type) {
+                    ExerciseType.TIMED -> "Serie ${currentSetNum + 1} • ${currentSet?.durationSeconds ?: 0}s"
+                    ExerciseType.CARDIO -> currentExercise.name
+                    else -> "Serie ${currentSetNum + 1} • ${currentSet?.weight ?: 0}kg"
+                },
                 restNextAction = restNextAction,
                 onToggleNextAction = { viewModel.setRestNextAction(it) },
                 restMessage = restMessage,
@@ -271,21 +323,23 @@ fun ActiveExerciseFocusCard(
     previousSetRecord: SetRecord? = null,
     isLastExercise: Boolean = false,
     modifier: Modifier = Modifier,
-    onUpdateSet: (Double, Int, Int?) -> Unit,
+    onUpdateStrengthSet: (weight: Double, reps: Int, rir: Int?) -> Unit = { _, _, _ -> },
+    onUpdateTimedSet: (durationSeconds: Int) -> Unit = { _ -> },
+    onUpdateCardioSet: (speedKmh: Double, inclinePercent: Double, durationSeconds: Int) -> Unit = { _, _, _ -> },
     onReady: () -> Unit,
     onFinishExercise: () -> Unit,
     onFinishSession: () -> Unit = {}
 ) {
-    // Peso inicial: primero el guardado en el set actual,
-    // si no hay, hereda de la serie anterior (misma sesión),
-    // y si tampoco, queda vacío (ya fue prefilled desde la sesión anterior por el ViewModel)
-    val initialWeight = (currentSetRecord?.weight?.takeIf { it > 0 }
-        ?: previousSetRecord?.weight?.takeIf { it > 0 }
-        ?: 0.0)
-    val initialReps = (currentSetRecord?.reps?.takeIf { it > 0 }
-        ?: previousSetRecord?.reps?.takeIf { it > 0 }
-        ?: 0)
+    val context = LocalContext.current
+    val exerciseType = exercise.type
+    val targetSets = exercise.targetSets.coerceAtLeast(1)
+    val isLastTargetSet = setNumber >= targetSets
 
+    // ---- Estado para STRENGTH ----
+    val initialWeight = currentSetRecord?.weight?.takeIf { it > 0 }
+        ?: previousSetRecord?.weight?.takeIf { it > 0 } ?: 0.0
+    val initialReps = currentSetRecord?.reps?.takeIf { it > 0 }
+        ?: previousSetRecord?.reps?.takeIf { it > 0 } ?: 0
     var weightText by remember(exercise.id, setNumber) {
         mutableStateOf(if (initialWeight > 0) initialWeight.toString() else "")
     }
@@ -294,14 +348,28 @@ fun ActiveExerciseFocusCard(
     }
     var rir by remember(exercise.id, setNumber) { mutableStateOf(currentSetRecord?.rir ?: 2) }
 
-    val context = LocalContext.current
-    val targetSets = exercise.targetSets.coerceAtLeast(1)
-    val isLastTargetSet = setNumber >= targetSets
+    // ---- Estado para TIMED ----
+    val initialDuration = currentSetRecord?.durationSeconds
+        ?: previousSetRecord?.durationSeconds ?: 0
+    var durationText by remember(exercise.id, setNumber) {
+        mutableStateOf(if (initialDuration > 0) initialDuration.toString() else "")
+    }
 
-    GlassCard(
-        modifier = modifier.fillMaxWidth(),
-        padding = 0.dp
-    ) {
+    // ---- Estado para CARDIO ----
+    val initialSpeed = currentSetRecord?.speedKmh ?: previousSetRecord?.speedKmh ?: 0.0
+    val initialIncline = currentSetRecord?.inclinePercent ?: previousSetRecord?.inclinePercent ?: 0.0
+    val initialCardioDuration = currentSetRecord?.durationSeconds ?: previousSetRecord?.durationSeconds ?: 0
+    var speedText by remember(exercise.id, setNumber) {
+        mutableStateOf(if (initialSpeed > 0) initialSpeed.toString() else "")
+    }
+    var inclineText by remember(exercise.id, setNumber) {
+        mutableStateOf(if (initialIncline > 0) initialIncline.toString() else "")
+    }
+    var cardioDurationText by remember(exercise.id, setNumber) {
+        mutableStateOf(if (initialCardioDuration > 0) initialCardioDuration.toString() else "")
+    }
+
+    GlassCard(modifier = modifier.fillMaxWidth(), padding = 0.dp) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -310,11 +378,8 @@ fun ActiveExerciseFocusCard(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Header: subtítulo (equipo – grupo muscular) + nombre + botón de video
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
+            // Header: subtítulo + nombre + botón de video
+            Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 val subtitle = buildList<String> {
                     if (exercise.equipment.isNotEmpty()) add(exercise.equipment)
                     if (exercise.muscleGroup.isNotEmpty()) add(exercise.muscleGroup)
@@ -322,11 +387,7 @@ fun ActiveExerciseFocusCard(
                 if (subtitle.isNotEmpty()) {
                     Text(subtitle.uppercase(), fontSize = 11.sp, color = Color.Gray, letterSpacing = 1.sp)
                 }
-                // Nombre + botón YouTube-style
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                     Text(
                         exercise.name,
                         fontSize = 22.sp,
@@ -350,74 +411,161 @@ fun ActiveExerciseFocusCard(
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Icon(
-                                Icons.Default.PlayArrow,
-                                contentDescription = "Ver video del ejercicio",
-                                tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Ver video", tint = Color.White, modifier = Modifier.size(18.dp))
                         }
                     }
                 }
             }
 
-            // Badge de serie — resaltado si es la última serie objetivo
-            Surface(
-                color = if (isLastTargetSet) Color(0xFF4CAF50) else Primary,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Text(
-                    if (isLastTargetSet) "★  SERIE $setNumber DE $totalSets" else "SERIE $setNumber DE $totalSets",
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
-                    color = if (isLastTargetSet) Color.White else Color.Black,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
-                )
+            // Badge de serie (CARDIO muestra "SESIÓN DE CARDIO")
+            when (exerciseType) {
+                ExerciseType.CARDIO -> {
+                    Surface(color = Color(0xFF1565C0), shape = RoundedCornerShape(12.dp)) {
+                        Text(
+                            "🏃  SESIÓN DE CARDIO",
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+                else -> {
+                    Surface(
+                        color = if (isLastTargetSet) Color(0xFF4CAF50) else Primary,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            if (isLastTargetSet) "★  SERIE $setNumber DE $totalSets" else "SERIE $setNumber DE $totalSets",
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
+                            color = if (isLastTargetSet) Color.White else Color.Black,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
             }
 
-            // Inputs de peso y reps
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                FocusedInput(
-                    label = "PESO (kg)",
-                    value = weightText,
-                    onValueChange = {
-                        weightText = it
-                        onUpdateSet(it.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-                FocusedInput(
-                    label = "REPS",
-                    value = repsText,
-                    onValueChange = {
-                        repsText = it
-                        onUpdateSet(weightText.toDoubleOrNull() ?: 0.0, it.toIntOrNull() ?: 0, rir)
-                    },
-                    modifier = Modifier.weight(1f)
-                )
-            }
-
-            // RIR
-            Column(modifier = Modifier.fillMaxWidth()) {
-                Text("RIR — Esfuerzo sobrante", fontSize = 12.sp, color = Color.Gray)
-                Spacer(Modifier.height(8.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf(0, 1, 2, 3, 4).forEach { value ->
-                        RirFocusButton(
-                            value = value,
-                            isSelected = rir == value,
-                            onClick = {
-                                rir = value
-                                onUpdateSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, value)
+            // ============================
+            // INPUTS SEGÚN TIPO
+            // ============================
+            when (exerciseType) {
+                ExerciseType.STRENGTH -> {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        FocusedInput(
+                            label = "PESO (kg)",
+                            value = weightText,
+                            onValueChange = {
+                                weightText = it
+                                onUpdateStrengthSet(it.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
                             },
                             modifier = Modifier.weight(1f)
                         )
+                        FocusedInput(
+                            label = "REPS",
+                            value = repsText,
+                            onValueChange = {
+                                repsText = it
+                                onUpdateStrengthSet(weightText.toDoubleOrNull() ?: 0.0, it.toIntOrNull() ?: 0, rir)
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    // RIR
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        Text("RIR — Esfuerzo sobrante", fontSize = 12.sp, color = Color.Gray)
+                        Spacer(Modifier.height(8.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(0, 1, 2, 3, 4).forEach { value ->
+                                RirFocusButton(
+                                    value = value,
+                                    isSelected = rir == value,
+                                    onClick = {
+                                        rir = value
+                                        onUpdateStrengthSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, value)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                ExerciseType.TIMED -> {
+                    FocusedInput(
+                        label = "DURACIÓN (segundos)",
+                        value = durationText,
+                        onValueChange = {
+                            durationText = it
+                            onUpdateTimedSet(it.toIntOrNull() ?: 0)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                ExerciseType.CARDIO -> {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        FocusedInput(
+                            label = "VELOCIDAD (km/h)",
+                            value = speedText,
+                            onValueChange = {
+                                speedText = it
+                                onUpdateCardioSet(
+                                    it.toDoubleOrNull() ?: 0.0,
+                                    inclineText.toDoubleOrNull() ?: 0.0,
+                                    cardioDurationText.toIntOrNull() ?: 0
+                                )
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        FocusedInput(
+                            label = "INCLINACIÓN (%)",
+                            value = inclineText,
+                            onValueChange = {
+                                inclineText = it
+                                onUpdateCardioSet(
+                                    speedText.toDoubleOrNull() ?: 0.0,
+                                    it.toDoubleOrNull() ?: 0.0,
+                                    cardioDurationText.toIntOrNull() ?: 0
+                                )
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    FocusedInput(
+                        label = "DURACIÓN (minutos)",
+                        value = cardioDurationText,
+                        onValueChange = {
+                            cardioDurationText = it
+                            onUpdateCardioSet(
+                                speedText.toDoubleOrNull() ?: 0.0,
+                                inclineText.toDoubleOrNull() ?: 0.0,
+                                // Convertimos minutos a segundos al guardar
+                                ((it.toDoubleOrNull() ?: 0.0) * 60).toInt()
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    // Distancia calculada
+                    val speedVal = speedText.toDoubleOrNull() ?: 0.0
+                    val durationMin = cardioDurationText.toDoubleOrNull() ?: 0.0
+                    if (speedVal > 0 && durationMin > 0) {
+                        val distKm = speedVal * (durationMin / 60.0)
+                        Surface(
+                            color = Color(0xFF1565C0).copy(alpha = 0.15f),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text(
+                                "Distancia estimada: ${"%.2f".format(distKm)} km",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                color = Color(0xFF90CAF9),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }
@@ -425,76 +573,98 @@ fun ActiveExerciseFocusCard(
             // ============================
             // ZONA DE ACCIONES
             // ============================
-            if (isLastExercise) {
-                // --- Último ejercicio: botón principal = TERMINAR ENTRENAMIENTO ---
-                Button(
-                    onClick = {
-                        onUpdateSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
-                        onFinishSession()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(64.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4CAF50) // verde vibrante
-                    )
-                ) {
-                    Text(
-                        "🏁  TERMINAR ENTRENAMIENTO",
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = Color.White,
-                        letterSpacing = 0.5.sp
-                    )
+            when {
+                exerciseType == ExerciseType.CARDIO -> {
+                    Button(
+                        onClick = {
+                            onUpdateCardioSet(
+                                speedText.toDoubleOrNull() ?: 0.0,
+                                inclineText.toDoubleOrNull() ?: 0.0,
+                                ((cardioDurationText.toDoubleOrNull() ?: 0.0) * 60).toInt()
+                            )
+                            if (isLastExercise) onFinishSession() else onFinishExercise()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(60.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isLastExercise) Color(0xFF4CAF50) else Color(0xFF1565C0)
+                        )
+                    ) {
+                        Text(
+                            if (isLastExercise) "🏁  FIN ENTRENAMIENTO" else "✓  TERMINAR CARDIO",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                    }
+                    if (!isLastExercise) {
+                        TextButton(
+                            onClick = { onFinishExercise() },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Saltar ejercicio", color = Color.White.copy(alpha = 0.45f), fontSize = 13.sp)
+                        }
+                    }
                 }
-                // Opción secundaria: hacer otra serie antes de terminar
-                TextButton(
-                    onClick = {
-                        onUpdateSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
-                        onReady()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        "Hacer otra serie (iniciar descanso)",
-                        color = Color.White.copy(alpha = 0.45f),
-                        fontSize = 13.sp
-                    )
+
+                isLastExercise && isLastTargetSet -> {
+                    Button(
+                        onClick = {
+                            if (exerciseType == ExerciseType.TIMED)
+                                onUpdateTimedSet(durationText.toIntOrNull() ?: 0)
+                            else
+                                onUpdateStrengthSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
+                            onFinishSession()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(64.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
+                    ) {
+                        Text("🏁  FIN ENTRENAMIENTO", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = Color.White, letterSpacing = 0.5.sp)
+                    }
+                    TextButton(
+                        onClick = {
+                            if (exerciseType == ExerciseType.TIMED)
+                                onUpdateTimedSet(durationText.toIntOrNull() ?: 0)
+                            else
+                                onUpdateStrengthSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
+                            onReady()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Hacer otra serie (iniciar descanso)", color = Color.White.copy(alpha = 0.45f), fontSize = 13.sp)
+                    }
                 }
-            } else {
-                // --- Ejercicio normal: botón principal = LISTO / DESCANSO ---
-                Button(
-                    onClick = {
-                        onUpdateSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
-                        onReady()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(60.dp),
-                    shape = RoundedCornerShape(18.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                ) {
-                    Text(
-                        "✓  LISTO — INICIAR DESCANSO",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Black
-                    )
-                }
-                // Opción secundaria: pasar al siguiente ejercicio sin descanso
-                TextButton(
-                    onClick = {
-                        onUpdateSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
-                        onFinishExercise()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text(
-                        "Siguiente Ejercicio",
-                        color = Color.White.copy(alpha = 0.45f),
-                        fontSize = 13.sp
-                    )
+
+                else -> {
+                    Button(
+                        onClick = {
+                            if (exerciseType == ExerciseType.TIMED)
+                                onUpdateTimedSet(durationText.toIntOrNull() ?: 0)
+                            else
+                                onUpdateStrengthSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
+                            onReady()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(60.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                    ) {
+                        Text("✓  LISTO — INICIAR DESCANSO", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                    }
+                    if (!isLastExercise) {
+                        TextButton(
+                            onClick = {
+                                if (exerciseType == ExerciseType.TIMED)
+                                    onUpdateTimedSet(durationText.toIntOrNull() ?: 0)
+                                else
+                                    onUpdateStrengthSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
+                                onFinishExercise()
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Siguiente Ejercicio", color = Color.White.copy(alpha = 0.45f), fontSize = 13.sp)
+                        }
+                    }
                 }
             }
 

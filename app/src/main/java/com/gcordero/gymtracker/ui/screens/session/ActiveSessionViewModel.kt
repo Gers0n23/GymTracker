@@ -30,6 +30,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
+import java.util.Date
 
 class ActiveSessionViewModel(
     application: Application,
@@ -83,6 +86,10 @@ class ActiveSessionViewModel(
     private val _restCompletedEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val restCompletedEvent: SharedFlow<Unit> = _restCompletedEvent.asSharedFlow()
 
+    // Se emite true si la sesión se restauró desde un borrador guardado
+    private val _isDraftRestored = MutableStateFlow(false)
+    val isDraftRestored: StateFlow<Boolean> = _isDraftRestored.asStateFlow()
+
     private val motivationalMessages = listOf(
         "¡Extraordinario! 💥",
         "¡Sigue así, crack! 🔥",
@@ -96,25 +103,48 @@ class ActiveSessionViewModel(
         _restNextAction.value = action
     }
 
+    // Identificador de la rutina actual (necesario para persistencia del borrador)
+    private var currentRoutineId: String = ""
+
+    // Timestamp de inicio real de la sesión (ms desde epoch). Se restaura del borrador si existe.
+    private var startTimeMs: Long = System.currentTimeMillis()
+
     private var timerJob: Job? = null
     private var restTimerJob: Job? = null
-    private val startTime = Timestamp.now()
 
     fun startSession(routineId: String) {
+        // Si el ViewModel sobrevivió (e.g., volvió de YouTube), el estado sigue intacto
+        if (_sets.value.isNotEmpty()) return
+
+        currentRoutineId = routineId
+
+        // Intentar restaurar un borrador guardado
+        val draft = loadDraft(routineId)
+        if (draft != null) {
+            startTimeMs = draft.startTimeMs
+            _currentExerciseIndex.value = draft.currentExerciseIndex
+            _currentSetNumber.value = draft.currentSetNumber
+            _sets.value = draft.sets
+            // Calcular cuánto tiempo ha pasado realmente desde el inicio
+            _timerSeconds.value = ((System.currentTimeMillis() - startTimeMs) / 1000).toInt()
+            _isDraftRestored.value = true
+        } else {
+            startTimeMs = System.currentTimeMillis()
+        }
+
         viewModelScope.launch {
             val routine = routineRepository.getRoutineById(routineId)
             _routineName.value = routine?.name ?: "Entrenamiento"
         }
 
-        // Cargar pesos de la sesión anterior para prefill
         val userId = auth.currentUser?.uid ?: "test_user"
         viewModelScope.launch {
             val lastWeights = workoutRepository.getLastWeightsByRoutine(routineId, userId)
             _lastSessionWeights.value = lastWeights
 
-            // Una vez que tengamos los ejercicios, prefill los sets iniciales
             exerciseRepository.getExercisesByRoutine(routineId).collect { exerciseList ->
                 _exercises.value = exerciseList
+                // Solo inicializar sets si no se restauró borrador ni sobrevivió el VM
                 if (_sets.value.isEmpty()) {
                     val initialSets = mutableMapOf<String, List<SetRecord>>()
                     exerciseList.forEach { exercise ->
@@ -124,7 +154,7 @@ class ActiveSessionViewModel(
                                 exerciseId = exercise.id,
                                 exerciseName = exercise.name,
                                 setNumber = 1,
-                                weight = lastWeight  // prefill con el peso de la última sesión
+                                weight = lastWeight
                             )
                         )
                     }
@@ -174,14 +204,13 @@ class ActiveSessionViewModel(
         _restTimerSeconds.value = 90 // Default 90s rest
         _isResting.value = true
 
-        // Determinar mensaje motivacional según progreso vs series objetivo
         val exercise = _exercises.value.getOrNull(_currentExerciseIndex.value)
         val completedSetNum = _currentSetNumber.value
         val targetSets = (exercise?.targetSets ?: 3).coerceAtLeast(1)
 
         val message = when {
             completedSetNum >= targetSets -> {
-                _restNextAction.value = "ejercicio" // auto-switch al terminar el objetivo
+                _restNextAction.value = "ejercicio"
                 "¡Terminaste! ¡Bien hecho! 🎉"
             }
             completedSetNum == targetSets - 1 -> "¡Falta solo 1 serie más! 💪"
@@ -189,7 +218,6 @@ class ActiveSessionViewModel(
         }
         _restMessage.value = message
 
-        // Schedule background alarm 2s after timer ends (fires if app is backgrounded)
         scheduleRestAlarm(_restTimerSeconds.value + 2)
 
         restTimerJob = viewModelScope.launch {
@@ -210,24 +238,19 @@ class ActiveSessionViewModel(
     private fun onRestComplete(skipped: Boolean = false) {
         if (!skipped) {
             val app = getApplication<Application>()
-            // Vibrar y notificar directamente desde el ViewModel:
-            // Esto funciona tanto en foreground como en background ligero (coroutine sigue corriendo).
-            // El BroadcastReceiver solo actúa en Doze profundo (cuando el proceso está suspendido).
             RestTimerReceiver.vibrate(app)
             RestTimerReceiver.showNotification(app)
         }
-        cancelRestAlarm() // Cancelar la alarma de respaldo después de haberla manejado aquí
+        cancelRestAlarm()
         _isResting.value = false
         _restTimerSeconds.value = 0
 
         if (_restNextAction.value == "ejercicio") {
-            // El usuario eligió pasar al siguiente ejercicio
             nextExercise()
-            _restNextAction.value = "serie" // reset para el próximo descanso
+            _restNextAction.value = "serie"
             return
         }
 
-        // Avanzar a la siguiente serie del mismo ejercicio
         val exercise = _exercises.value.getOrNull(_currentExerciseIndex.value) ?: return
         val currentSets = _sets.value[exercise.id] ?: emptyList()
         val lastSet = currentSets.lastOrNull()
@@ -239,15 +262,21 @@ class ActiveSessionViewModel(
                 exerciseName = exercise.name,
                 initialWeight = lastSet?.weight ?: 0.0,
                 initialReps = lastSet?.reps ?: 0,
-                initialRir = lastSet?.rir  // RIR se hereda de la serie anterior
+                initialRir = lastSet?.rir,
+                initialDurationSeconds = lastSet?.durationSeconds,
+                initialSpeedKmh = lastSet?.speedKmh,
+                initialInclinePercent = lastSet?.inclinePercent
             )
         }
+
+        saveDraft(currentRoutineId)
     }
 
     fun nextExercise() {
         if (_currentExerciseIndex.value < _exercises.value.size - 1) {
             _currentExerciseIndex.value += 1
             _currentSetNumber.value = 1
+            saveDraft(currentRoutineId)
         }
     }
 
@@ -256,7 +285,10 @@ class ActiveSessionViewModel(
         exerciseName: String,
         initialWeight: Double = 0.0,
         initialReps: Int = 0,
-        initialRir: Int? = null
+        initialRir: Int? = null,
+        initialDurationSeconds: Int? = null,
+        initialSpeedKmh: Double? = null,
+        initialInclinePercent: Double? = null
     ) {
         val currentSets = _sets.value.toMutableMap()
         val exerciseSets = currentSets[exerciseId]?.toMutableList() ?: mutableListOf()
@@ -267,7 +299,10 @@ class ActiveSessionViewModel(
                 setNumber = exerciseSets.size + 1,
                 weight = initialWeight,
                 reps = initialReps,
-                rir = initialRir
+                rir = initialRir,
+                durationSeconds = initialDurationSeconds,
+                speedKmh = initialSpeedKmh,
+                inclinePercent = initialInclinePercent
             )
         )
         currentSets[exerciseId] = exerciseSets
@@ -278,24 +313,51 @@ class ActiveSessionViewModel(
         val currentSets = _sets.value.toMutableMap()
         val exerciseSets = currentSets[exerciseId]?.toMutableList() ?: return
         if (index < exerciseSets.size) {
-            exerciseSets[index] = exerciseSets[index].copy(
-                weight = weight,
-                reps = reps,
-                rir = rir
-            )
+            exerciseSets[index] = exerciseSets[index].copy(weight = weight, reps = reps, rir = rir)
             currentSets[exerciseId] = exerciseSets
             _sets.value = currentSets
+            saveDraft(currentRoutineId)
         }
     }
 
-    companion object {
-        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
-                val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
-                return ActiveSessionViewModel(application) as T
-            }
+    fun updateTimedSet(exerciseId: String, index: Int, durationSeconds: Int) {
+        val currentSets = _sets.value.toMutableMap()
+        val exerciseSets = currentSets[exerciseId]?.toMutableList() ?: return
+        if (index < exerciseSets.size) {
+            exerciseSets[index] = exerciseSets[index].copy(durationSeconds = durationSeconds)
+            currentSets[exerciseId] = exerciseSets
+            _sets.value = currentSets
+            saveDraft(currentRoutineId)
         }
+    }
+
+    fun updateCardioSet(
+        exerciseId: String,
+        index: Int,
+        speedKmh: Double,
+        inclinePercent: Double,
+        durationSeconds: Int
+    ) {
+        val currentSets = _sets.value.toMutableMap()
+        val exerciseSets = currentSets[exerciseId]?.toMutableList() ?: return
+        if (index < exerciseSets.size) {
+            exerciseSets[index] = exerciseSets[index].copy(
+                speedKmh = speedKmh,
+                inclinePercent = inclinePercent,
+                durationSeconds = durationSeconds
+            )
+            currentSets[exerciseId] = exerciseSets
+            _sets.value = currentSets
+            saveDraft(currentRoutineId)
+        }
+    }
+
+    /** Abandona la sesión sin guardar: limpia el borrador y cancela timers. */
+    fun abandonSession() {
+        clearDraft(currentRoutineId)
+        timerJob?.cancel()
+        restTimerJob?.cancel()
+        cancelRestAlarm()
     }
 
     fun finishSession(routineId: String) {
@@ -308,17 +370,128 @@ class ActiveSessionViewModel(
             userId = userId,
             routineId = routineId,
             routineName = name,
-            startTime = startTime,
+            startTime = Timestamp(Date(startTimeMs)),
             endTime = Timestamp.now(),
             totalWeightLifted = totalWeight
         )
 
         viewModelScope.launch {
             val sessionId = workoutRepository.saveWorkoutSession(session, allSets)
+            clearDraft(routineId)
             SessionHolder.selectedSession = session.copy(id = sessionId)
             timerJob?.cancel()
-            // Activar DESPUES de que todo esté listo para que la UI navegue
             _isSessionSaved.value = true
+        }
+    }
+
+    // =====================================================================
+    // Persistencia de borrador en SharedPreferences (org.json)
+    // Protege contra la muerte del proceso cuando Android mata la app.
+    // =====================================================================
+
+    private data class SessionDraft(
+        val startTimeMs: Long,
+        val currentExerciseIndex: Int,
+        val currentSetNumber: Int,
+        val sets: Map<String, List<SetRecord>>
+    )
+
+    private fun saveDraft(routineId: String) {
+        if (routineId.isEmpty()) return
+        val prefs = getApplication<Application>()
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        try {
+            val setsJson = JSONObject()
+            _sets.value.forEach { (exerciseId, setList) ->
+                val setArray = JSONArray()
+                setList.forEach { set ->
+                    setArray.put(JSONObject().apply {
+                        put("exerciseId", set.exerciseId)
+                        put("exerciseName", set.exerciseName)
+                        put("setNumber", set.setNumber)
+                        put("weight", set.weight)
+                        put("reps", set.reps)
+                        if (set.rir != null) put("rir", set.rir)
+                        if (set.durationSeconds != null) put("durationSeconds", set.durationSeconds)
+                        if (set.speedKmh != null) put("speedKmh", set.speedKmh)
+                        if (set.inclinePercent != null) put("inclinePercent", set.inclinePercent)
+                    })
+                }
+                setsJson.put(exerciseId, setArray)
+            }
+            val json = JSONObject().apply {
+                put("startTimeMs", startTimeMs)
+                put("currentExerciseIndex", _currentExerciseIndex.value)
+                put("currentSetNumber", _currentSetNumber.value)
+                put("savedAt", System.currentTimeMillis())
+                put("sets", setsJson)
+            }
+            prefs.edit().putString("draft_$routineId", json.toString()).apply()
+        } catch (_: Exception) {
+            // Fallo silencioso — el guardado del borrador es best-effort
+        }
+    }
+
+    private fun loadDraft(routineId: String): SessionDraft? {
+        val prefs = getApplication<Application>()
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val jsonStr = prefs.getString("draft_$routineId", null) ?: return null
+        return try {
+            val json = JSONObject(jsonStr)
+            val savedAt = json.getLong("savedAt")
+            // Solo restaurar borradores de las últimas 12 horas
+            if (System.currentTimeMillis() - savedAt > 12 * 60 * 60 * 1000L) {
+                clearDraft(routineId)
+                return null
+            }
+            val startTimeMsVal = json.getLong("startTimeMs")
+            val currentExerciseIndex = json.getInt("currentExerciseIndex")
+            val currentSetNumber = json.getInt("currentSetNumber")
+            val setsJson = json.getJSONObject("sets")
+            val sets = mutableMapOf<String, List<SetRecord>>()
+            setsJson.keys().forEach { exerciseId ->
+                val setArray = setsJson.getJSONArray(exerciseId)
+                val setList = mutableListOf<SetRecord>()
+                for (i in 0 until setArray.length()) {
+                    val s = setArray.getJSONObject(i)
+                    setList.add(
+                        SetRecord(
+                            exerciseId = s.getString("exerciseId"),
+                            exerciseName = s.getString("exerciseName"),
+                            setNumber = s.getInt("setNumber"),
+                            weight = s.getDouble("weight"),
+                            reps = s.getInt("reps"),
+                            rir = if (s.has("rir")) s.getInt("rir") else null,
+                            durationSeconds = if (s.has("durationSeconds")) s.getInt("durationSeconds") else null,
+                            speedKmh = if (s.has("speedKmh")) s.getDouble("speedKmh") else null,
+                            inclinePercent = if (s.has("inclinePercent")) s.getDouble("inclinePercent") else null
+                        )
+                    )
+                }
+                sets[exerciseId] = setList
+            }
+            SessionDraft(startTimeMsVal, currentExerciseIndex, currentSetNumber, sets)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun clearDraft(routineId: String) {
+        if (routineId.isEmpty()) return
+        val prefs = getApplication<Application>()
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().remove("draft_$routineId").apply()
+    }
+
+    companion object {
+        private const val PREFS_NAME = "gymtracker_session_drafts"
+
+        val Factory: ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+                val application = checkNotNull(extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY])
+                return ActiveSessionViewModel(application) as T
+            }
         }
     }
 }

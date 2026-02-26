@@ -12,7 +12,20 @@
           "package_name": "com.gcordero.gymtracker"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "510442852605-agt92bbb7ltig25nsfepriaq31d1650r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gcordero.gymtracker",
+            "certificate_hash": "543f5a10778f3b3845ebe175467e1ca83d8deee5"
+          }
+        },
+        {
+          "client_id": "510442852605-404tsgmao7nt57gsd81ic2ie9p7v0dmv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyClSSohJdeCdaCi4eLHapoy4ain8KKajMc"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "510442852605-404tsgmao7nt57gsd81ic2ie9p7v0dmv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

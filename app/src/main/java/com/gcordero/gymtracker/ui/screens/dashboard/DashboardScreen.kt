@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
@@ -84,39 +85,21 @@ fun DashboardScreen(
     navController: androidx.navigation.NavHostController,
     viewModel: DashboardViewModel = viewModel()
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
-    val populateState by viewModel.populateState.collectAsState()
     val uiState by viewModel.uiState.collectAsState()
     val auth = com.google.firebase.auth.FirebaseAuth.getInstance()
-    val userId = auth.currentUser?.uid ?: "test_user"
 
-    var selectedMuscle by remember { mutableStateOf<MuscleGroup?>(null) }
-
-    LaunchedEffect(populateState) {
-        when (val s = populateState) {
-            is PopulateState.Loading -> snackbarHostState.showSnackbar("Cargando datos...")
-            is PopulateState.Success -> { snackbarHostState.showSnackbar("¡Base de Datos Poblada!"); viewModel.resetState() }
-            is PopulateState.Error   -> { snackbarHostState.showSnackbar("Error: ${s.message}"); viewModel.resetState() }
-            else -> Unit
-        }
-    }
+    var selectedMuscle    by remember { mutableStateOf<MuscleGroup?>(null) }
+    var showSignOutDialog by remember { mutableStateOf(false) }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
                     Text("GymTracker", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = IndigoLight)
                 },
                 actions = {
-                    TextButton(
-                        onClick = { viewModel.populateData(userId) },
-                        enabled = populateState !is PopulateState.Loading
-                    ) {
-                        if (populateState is PopulateState.Loading)
-                            CircularProgressIndicator(Modifier.size(12.dp), color = Txt3, strokeWidth = 1.5.dp)
-                        else
-                            Text("DEBUG", color = Txt3, fontSize = 10.sp)
+                    IconButton(onClick = { showSignOutDialog = true }) {
+                        Icon(Icons.Default.ExitToApp, contentDescription = "Cerrar sesión", tint = Txt2)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xEB0D0D0D))
@@ -129,10 +112,16 @@ fun DashboardScreen(
                     unselectedIconColor = Txt3, unselectedTextColor = Txt3,
                     indicatorColor = Color.Transparent
                 )
-                NavigationBarItem(true,  { },                                                   icon = { Icon(Icons.Default.Home,   null) }, label = { Text("Inicio") },    colors = nc)
-                NavigationBarItem(false, { navController.navigate(Screen.Routines.route) },      icon = { Icon(Icons.Default.Star,   null) }, label = { Text("Rutinas") },   colors = nc)
-                NavigationBarItem(false, { navController.navigate(Screen.WorkoutHistory.route) }, icon = { Icon(Icons.Default.List,   null) }, label = { Text("Historial") }, colors = nc)
-                NavigationBarItem(false, { navController.navigate(Screen.BodyMetrics.route) },   icon = { Icon(Icons.Default.Person, null) }, label = { Text("Perfil") },    colors = nc)
+                NavigationBarItem(true,  { }, icon = { Icon(Icons.Default.Home,   null) }, label = { Text("Inicio") },    colors = nc)
+                NavigationBarItem(false, {
+                    navController.navigate(Screen.Routines.route) { launchSingleTop = true }
+                }, icon = { Icon(Icons.Default.Star,   null) }, label = { Text("Rutinas") },   colors = nc)
+                NavigationBarItem(false, {
+                    navController.navigate(Screen.WorkoutHistory.route) { launchSingleTop = true }
+                }, icon = { Icon(Icons.Default.List,   null) }, label = { Text("Historial") }, colors = nc)
+                NavigationBarItem(false, {
+                    navController.navigate(Screen.BodyMetrics.route) { launchSingleTop = true }
+                }, icon = { Icon(Icons.Default.Person, null) }, label = { Text("Perfil") },    colors = nc)
             }
         },
         containerColor = Bg
@@ -189,6 +178,28 @@ fun DashboardScreen(
 
     if (selectedMuscle != null) {
         MuscleDetailBottomSheet(muscle = selectedMuscle!!, onDismiss = { selectedMuscle = null })
+    }
+
+    if (showSignOutDialog) {
+        AlertDialog(
+            onDismissRequest = { showSignOutDialog = false },
+            title = { Text("Cerrar sesión", color = Color(0xFFF0F0F0), fontWeight = FontWeight.Bold) },
+            text  = { Text("¿Estás seguro de que quieres cerrar sesión?", color = Color(0xFF888888)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showSignOutDialog = false
+                    auth.signOut()
+                }) {
+                    Text("Cerrar sesión", color = Red, fontWeight = FontWeight.SemiBold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showSignOutDialog = false }) {
+                    Text("Cancelar", color = IndigoLight)
+                }
+            },
+            containerColor = CardSurface
+        )
     }
 }
 

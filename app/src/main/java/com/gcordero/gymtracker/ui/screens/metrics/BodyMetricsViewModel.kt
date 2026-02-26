@@ -26,9 +26,11 @@ data class MacroRecommendation(
 class BodyMetricsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = BodyMetricsRepository()
-    private val auth = FirebaseAuth.getInstance()
+    private val auth   = FirebaseAuth.getInstance()
+    private val userId = auth.currentUser?.uid ?: "default"
 
-    private val prefs = application.getSharedPreferences("body_prefs", Context.MODE_PRIVATE)
+    // Preferencias separadas por usuario para que altura, edad, sexo y proteínas no se mezclen
+    private val prefs = application.getSharedPreferences("body_prefs_$userId", Context.MODE_PRIVATE)
     private val todayKey = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
 
     private val _metrics = MutableStateFlow<List<BodyMetric>>(emptyList())

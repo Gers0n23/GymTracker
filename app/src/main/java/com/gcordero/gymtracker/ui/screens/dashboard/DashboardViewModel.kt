@@ -3,7 +3,6 @@ package com.gcordero.gymtracker.ui.screens.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gcordero.gymtracker.data.repository.DashboardRepository
-import com.gcordero.gymtracker.data.util.DataPopulator
 import com.gcordero.gymtracker.domain.model.Exercise
 import com.gcordero.gymtracker.domain.model.SetRecord
 import com.gcordero.gymtracker.domain.model.WorkoutSession
@@ -15,14 +14,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import java.util.Date
-
-// ── DEBUG populate state ──────────────────────────────────────────────────────
-sealed class PopulateState {
-    object Idle : PopulateState()
-    object Loading : PopulateState()
-    object Success : PopulateState()
-    data class Error(val message: String) : PopulateState()
-}
 
 // ── muscleGroup Spanish name → internal ID ────────────────────────────────────
 private val MUSCLE_ID_MAP = mapOf(
@@ -103,10 +94,6 @@ class DashboardViewModel(
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
-    // ── DEBUG populate state ──────────────────────────────────────────────────
-    private val _populateState = MutableStateFlow<PopulateState>(PopulateState.Idle)
-    val populateState: StateFlow<PopulateState> = _populateState.asStateFlow()
-
     init {
         loadDashboardData()
     }
@@ -120,8 +107,12 @@ class DashboardViewModel(
             val routineDow = calDow - 1  // DataPopulator: 1=Mon … 5=Fri
 
             // 1. User name
+            // Firestore puede tardar en crearse tras el primer login con Google,
+            // usamos el displayName de Firebase Auth como fallback inmediato.
             val user = repo.getUser(userId)
-            val userName = user?.name?.ifBlank { null } ?: "Entrenador"
+            val userName = user?.name?.ifBlank { null }
+                ?: auth.currentUser?.displayName?.ifBlank { null }
+                ?: "Entrenador"
 
             // 2. Greeting
             val greeting = computeGreeting(now.get(Calendar.HOUR_OF_DAY))
@@ -197,25 +188,6 @@ class DashboardViewModel(
                 smartTips           = smartTips
             )
         }
-    }
-
-    fun populateData(userId: String) {
-        if (_populateState.value is PopulateState.Loading) return
-        viewModelScope.launch {
-            _populateState.value = PopulateState.Loading
-            val result = DataPopulator.populateInitialData(userId)
-            _populateState.value = if (result.isSuccess) {
-                PopulateState.Success
-            } else {
-                PopulateState.Error(result.exceptionOrNull()?.localizedMessage ?: "Error desconocido")
-            }
-            // Reload dashboard after populate
-            if (result.isSuccess) loadDashboardData()
-        }
-    }
-
-    fun resetState() {
-        _populateState.value = PopulateState.Idle
     }
 
     // ── Computation helpers ───────────────────────────────────────────────────

@@ -148,9 +148,9 @@ class BodyMetricsViewModel(application: Application) : AndroidViewModel(applicat
             }
 
             val proteinG = when (goal) {
-                "muscle" -> (weightKg * 1.8).roundToInt()
+                "muscle" -> (weightKg * 2.0).roundToInt()
                 "cut"    -> (weightKg * 2.2).roundToInt()
-                else     -> (weightKg * 1.6).roundToInt()
+                else     -> (weightKg * 1.8).roundToInt()
             }.coerceAtLeast(50)
 
             val fatG = ((targetCal * 0.25) / 9).roundToInt().coerceAtLeast(30)

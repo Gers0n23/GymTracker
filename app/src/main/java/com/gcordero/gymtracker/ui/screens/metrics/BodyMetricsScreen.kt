@@ -285,67 +285,66 @@ private fun HeroMetricCard(latest: BodyMetric, previous: BodyMetric?) {
     val imcValue    = latest.imc ?: 0.0
     val (imcLabel, imcColor) =
         if (imcValue > 0) imcCategory(imcValue) else ("Sin datos" to Color(0xFF666666))
+    val musclePct = latest.musclePercentage
+    val fatPct    = latest.fatPercentage
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(24.dp))
             .background(
-                Brush.linearGradient(
-                    colors = listOf(Color(0xFF1E1E42), Color(0xFF16162A))
+                Brush.verticalGradient(
+                    colors = listOf(Color(0xFF23234A), Color(0xFF16162A))
                 )
             )
-            .border(1.dp, Primary.copy(alpha = 0.32f), RoundedCornerShape(20.dp))
-            .padding(20.dp)
+            .border(1.dp, Primary.copy(alpha = 0.32f), RoundedCornerShape(24.dp))
+            .padding(24.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-
-            // Date chip
-            Surface(
-                color = PrimaryDim,
-                shape = RoundedCornerShape(6.dp),
-                modifier = Modifier.wrapContentWidth()
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
+            // Header: Fecha y Diferencia
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "ÚLTIMA MEDICIÓN · ${fmtDate(latest)}".uppercase(),
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Primary,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                )
-            }
+                Surface(
+                    color = PrimaryDim,
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "ÚLTIMA MEDICIÓN · ${fmtDate(latest)}".uppercase(),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Primary,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
 
-            // Weight + delta
-            Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    text = "%.1f kg".format(latest.weightKg),
-                    fontSize = 42.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    lineHeight = 42.sp
-                )
                 if (delta != null) {
                     val deltaColor = if (deltaUp) RedAccent else GreenAccent
                     Surface(
-                        color = deltaColor.copy(alpha = 0.13f),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier.padding(bottom = 6.dp)
+                        color = deltaColor.copy(alpha = 0.15f),
+                        shape = RoundedCornerShape(8.dp)
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                         ) {
                             Icon(
-                                if (deltaUp) Icons.Default.KeyboardArrowUp
-                                else Icons.Default.KeyboardArrowDown,
+                                if (deltaUp) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                 contentDescription = null,
                                 tint = deltaColor,
-                                modifier = Modifier.size(14.dp)
+                                modifier = Modifier.size(16.dp)
                             )
+                            Spacer(Modifier.width(2.dp))
                             Text(
                                 text = "%.1f kg".format(abs(delta)),
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = deltaColor
                             )
@@ -354,71 +353,70 @@ private fun HeroMetricCard(latest: BodyMetric, previous: BodyMetric?) {
                 }
             }
 
-            // IMC row
-            if (imcValue > 0) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "IMC  ${"%.1f".format(imcValue)}",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                    )
-                    Surface(
-                        color = imcColor.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(6.dp)
-                    ) {
-                        Text(
-                            text = imcLabel,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = imcColor,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                        )
-                    }
-                }
+            // Central Weight
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "%.1f kg".format(latest.weightKg),
+                    fontSize = 58.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    lineHeight = 58.sp,
+                    textAlign = TextAlign.Center
+                )
             }
 
-            // Muscle / Fat chips
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                val musclePct = latest.musclePercentage
-                val fatPct    = latest.fatPercentage
-                if (musclePct != null) {
-                    CompositionChip(
-                        emoji = "💪",
-                        value = "%.1f kg".format(latest.weightKg * musclePct / 100),
-                        label = "Músculo",
-                        color = Primary
-                    )
-                }
-                if (fatPct != null) {
-                    CompositionChip(
-                        emoji = "📊",
-                        value = "%.1f kg".format(latest.weightKg * fatPct / 100),
-                        label = "Grasa",
-                        color = AmberAccent
-                    )
-                }
+            // 3 Bottom Metrics
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // IMC
+                MetricMiniCard(
+                    modifier = Modifier.weight(1f),
+                    emoji = if (imcValue > 0) "📉" else "➖",
+                    value = if (imcValue > 0) "%.1f".format(imcValue) else "—",
+                    label = imcLabel,
+                    color = imcColor
+                )
+
+                // Músculo
+                MetricMiniCard(
+                    modifier = Modifier.weight(1f),
+                    emoji = "💪",
+                    value = if (musclePct != null) "%.1f kg".format(latest.weightKg * musclePct / 100) else "—",
+                    label = "Músculo",
+                    color = if (musclePct != null) Primary else Color.Gray
+                )
+
+                // Grasa
+                MetricMiniCard(
+                    modifier = Modifier.weight(1f),
+                    emoji = "📊",
+                    value = if (fatPct != null) "%.1f kg".format(latest.weightKg * fatPct / 100) else "—",
+                    label = "Grasa",
+                    color = if (fatPct != null) AmberAccent else Color.Gray
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CompositionChip(emoji: String, value: String, label: String, color: Color) {
+private fun MetricMiniCard(modifier: Modifier = Modifier, emoji: String, value: String, label: String, color: Color) {
     Surface(
-        color = color.copy(alpha = 0.1f),
-        shape = RoundedCornerShape(10.dp)
+        modifier = modifier.fillMaxWidth(),
+        color = color.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(16.dp),
+        border = BorderStroke(1.dp, color.copy(alpha = 0.15f))
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp)
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.padding(vertical = 14.dp, horizontal = 4.dp)
         ) {
-            Text(emoji, fontSize = 14.sp)
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(value, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                Text(label, fontSize = 9.sp, color = Color(0xFF888888))
-            }
+            Text(emoji, fontSize = 20.sp)
+            Text(value, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+            Text(label, fontSize = 11.sp, color = color.copy(alpha = 0.9f), fontWeight = FontWeight.Bold)
         }
     }
 }

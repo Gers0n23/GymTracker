@@ -248,6 +248,59 @@
             border-color: var(--primary);
         }
 
+        /* Toggle Modes */
+        .mode-toggle {
+            display: flex;
+            background: rgba(0, 0, 0, 0.5);
+            /* Make the track visibly unified */
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 30px;
+            position: relative;
+            margin-bottom: 20px;
+            width: 100%;
+            height: 50px;
+            box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.6);
+        }
+
+        .mode-toggle input[type="radio"] {
+            display: none;
+        }
+
+        .mode-toggle label {
+            flex: 1;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            z-index: 2;
+            transition: color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .mode-toggle input[type="radio"]:checked+label {
+            color: #000;
+        }
+
+        .mode-toggle-slider {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            height: calc(100% - 8px);
+            width: calc(50% - 4px);
+            background: var(--primary);
+            border-radius: 26px;
+            transition: transform 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
+            z-index: 1;
+            box-shadow: 0 4px 10px rgba(187, 134, 252, 0.4);
+        }
+
+        #modeNextExercise:checked~.mode-toggle-slider {
+            transform: translateX(100%);
+        }
+
         /* Modal Rest Timer */
         #rest-overlay {
             position: fixed;
@@ -424,7 +477,38 @@
             <div class="active-card animate">
                 <div class="exercise-header">
                     <span class="exercise-type">MÁQUINA / CONTRATRACTOR</span>
-                    <h2 id="exercise-name" style="font-size: 24px; margin-top: 5px;">Aperturas en Contratractor</h2>
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 5px;">
+                        <h2 id="exercise-name" style="font-size: 24px; margin: 0; text-align: left;">Aperturas en
+                            Contratractor</h2>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn-ghost"
+                                style="font-size: 16px; padding: 5px; background: none; border: none; cursor: pointer;"
+                                onclick="toggleTips()" title="Tips del Ejercicio">💡</button>
+                            <button class="btn-ghost"
+                                style="font-size: 16px; padding: 5px; background: none; border: none; cursor: pointer;"
+                                title="Ver Video">🎥</button>
+                            <button class="btn-ghost"
+                                style="font-size: 16px; padding: 5px; background: none; border: none; cursor: pointer;"
+                                onclick="toggleNotes()" title="Notas">📝</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Campo de Notas -->
+                <div id="notesArea" style="display: none; margin-bottom: 15px;">
+                    <textarea placeholder="Ej: sentí dolor en hombro, subir peso..." rows="2"
+                        style="width: 100%; box-sizing: border-box; background: rgba(255,255,255,0.05); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; padding: 10px;"></textarea>
+                </div>
+
+                <!-- Campo de Tips -->
+                <div id="tipsArea"
+                    style="display: none; margin-bottom: 15px; padding: 15px; background: rgba(187, 134, 252, 0.1); border-left: 3px solid var(--primary); border-radius: 4px; font-size: 13px; text-align: left;">
+                    <ul style="margin: 0; padding-left: 20px; opacity: 0.9;">
+                        <li style="margin-bottom: 5px;">Mantén los codos ligeramente flexionados.</li>
+                        <li style="margin-bottom: 5px;">Siente el estiramiento en el pecho.</li>
+                        <li>Contrae fuerte al juntar los brazos.</li>
+                    </ul>
                 </div>
 
                 <div style="text-align: center;">
@@ -455,16 +539,23 @@
                     </div>
                 </div>
 
-                <button class="btn btn-primary"
-                    style="height: 65px; font-size: 18px; border-radius: 20px; box-shadow: 0 4px 15px rgba(187,134,252,0.3);"
-                    onclick="finishSet()">
+                <div class="mode-toggle">
+                    <input type="radio" id="modeNextRep" name="sessionMode" value="rep" checked
+                        onchange="updateMainBtnAction()">
+                    <label for="modeNextRep">Otra Repetición</label>
+
+                    <input type="radio" id="modeNextExercise" name="sessionMode" value="ex"
+                        onchange="updateMainBtnAction()">
+                    <label for="modeNextExercise">Sig. Ejercicio</label>
+
+                    <div class="mode-toggle-slider"></div>
+                </div>
+
+                <button id="mainBtn" class="btn btn-primary"
+                    style="height: 65px; font-size: 18px; border-radius: 20px; box-shadow: 0 4px 15px rgba(187,134,252,0.3); transition: all 0.3s;"
+                    onclick="handleMainAction()">
                     LISTO - INICIAR DESCANSO
                 </button>
-
-                <div style="display: flex; justify-content: center; margin-top: 20px;">
-                    <button class="btn btn-ghost" style="border: none; opacity: 0.5; font-size: 12px;"
-                        onclick="nextExercise()">TERMINAR EJERCICIO</button>
-                </div>
             </div>
         </div>
 
@@ -492,10 +583,47 @@
             });
         }
 
+        function toggleNotes() {
+            const area = document.getElementById('notesArea');
+            area.style.display = area.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function toggleTips() {
+            const area = document.getElementById('tipsArea');
+            area.style.display = area.style.display === 'none' ? 'block' : 'none';
+        }
+
         function finishSet() {
             // Show rest overlay
             document.getElementById('rest-overlay').style.display = 'flex';
             startRestTimer();
+        }
+
+        function updateMainBtnAction() {
+            const mode = document.querySelector('input[name="sessionMode"]:checked').value;
+            const mainBtn = document.getElementById('mainBtn');
+            if (mode === 'ex') {
+                mainBtn.textContent = "TERMINAR EJERCICIO";
+                mainBtn.style.background = "var(--secondary)";
+                mainBtn.style.color = "black";
+                mainBtn.style.boxShadow = "0 4px 15px rgba(3,218,198,0.4)";
+            } else {
+                mainBtn.textContent = "LISTO - INICIAR DESCANSO";
+                mainBtn.style.background = "var(--primary)";
+                mainBtn.style.color = "black";
+                mainBtn.style.boxShadow = "0 4px 15px rgba(187,134,252,0.3)";
+            }
+        }
+
+        function handleMainAction() {
+            const mode = document.querySelector('input[name="sessionMode"]:checked').value;
+            if (mode === 'ex') {
+                nextExercise();
+                document.getElementById('modeNextRep').checked = true;
+                updateMainBtnAction();
+            } else {
+                finishSet();
+            }
         }
 
         function startRestTimer() {

@@ -369,6 +369,8 @@ fun ActiveExerciseFocusCard(
         mutableStateOf(if (initialCardioDuration > 0) initialCardioDuration.toString() else "")
     }
 
+    var showTips by remember(exercise.id) { mutableStateOf(false) }
+
     GlassCard(modifier = modifier.fillMaxWidth(), padding = 0.dp) {
         Column(
             modifier = Modifier
@@ -396,23 +398,55 @@ fun ActiveExerciseFocusCard(
                         textAlign = TextAlign.Center,
                         modifier = Modifier.weight(1f)
                     )
-                    if (exercise.mediaUrl.isNotEmpty()) {
-                        Spacer(Modifier.width(10.dp))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFFFF0000))
-                                .clickable {
-                                    try {
-                                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(exercise.mediaUrl))
-                                        context.startActivity(intent)
-                                    } catch (_: Exception) {}
-                                }
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Ver video", tint = Color.White, modifier = Modifier.size(18.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        if (exercise.notes.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if(showTips) Primary else Glass)
+                                    .clickable { showTips = !showTips }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("💡", fontSize = 14.sp)
+                            }
                         }
+                        if (exercise.mediaUrl.isNotEmpty()) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFFF0000))
+                                    .clickable {
+                                        try {
+                                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(exercise.mediaUrl))
+                                            context.startActivity(intent)
+                                        } catch (_: Exception) {}
+                                    }
+                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = "Ver video", tint = Color.White, modifier = Modifier.size(18.dp))
+                            }
+                        }
+                    }
+                }
+                if (showTips && exercise.notes.isNotEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Primary.copy(alpha = 0.15f))
+                            .border(1.dp, Primary.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                            .padding(12.dp)
+                    ) {
+                        Text(
+                            text = exercise.notes,
+                            color = Color.White.copy(alpha = 0.9f),
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp,
+                            textAlign = TextAlign.Start
+                        )
                     }
                 }
             }
@@ -789,10 +823,10 @@ fun RestOverlay(
             }
 
             // Toggle: ¿Qué hacemos al terminar el descanso?
-            GlassCard(modifier = Modifier.fillMaxWidth(), padding = 6.dp) {
+            GlassCard(modifier = Modifier.fillMaxWidth(), padding = 16.dp) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
                         "AL TERMINAR EL DESCANSO",
@@ -800,59 +834,51 @@ fun RestOverlay(
                         color = Color.Gray,
                         letterSpacing = 1.sp
                     )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(50.dp)
+                            .clip(RoundedCornerShape(25.dp))
+                            .background(Color.Black.copy(alpha = 0.4f))
+                            .border(1.dp, Color.White.copy(alpha = 0.05f), RoundedCornerShape(25.dp))
                     ) {
-                        // Opción: otra serie
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (restNextAction == "serie") Primary
-                                    else Glass
-                                )
-                                .border(
-                                    1.dp,
-                                    if (restNextAction == "serie") Primary else GlassBorder,
-                                    RoundedCornerShape(12.dp)
-                                )
-                                .clickable { onToggleNextAction("serie") }
-                                .padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier.fillMaxSize()
                         ) {
-                            Text(
-                                "💪  Otra serie",
-                                color = if (restNextAction == "serie") Color.Black else Color.White.copy(alpha = 0.6f),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
-                        }
-                        // Opción: siguiente ejercicio
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(
-                                    if (restNextAction == "ejercicio") Color(0xFF3D8EFF)
-                                    else Glass
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .padding(4.dp)
+                                    .clip(RoundedCornerShape(21.dp))
+                                    .background(if (restNextAction == "serie") Primary else Color.Transparent)
+                                    .clickable { onToggleNextAction("serie") },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "💪  Otra serie",
+                                    color = if (restNextAction == "serie") Color.Black else Color.White.copy(alpha = 0.6f),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
                                 )
-                                .border(
-                                    1.dp,
-                                    if (restNextAction == "ejercicio") Color(0xFF3D8EFF) else GlassBorder,
-                                    RoundedCornerShape(12.dp)
+                            }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .fillMaxHeight()
+                                    .padding(4.dp)
+                                    .clip(RoundedCornerShape(21.dp))
+                                    .background(if (restNextAction == "ejercicio") Color(0xFF3D8EFF) else Color.Transparent)
+                                    .clickable { onToggleNextAction("ejercicio") },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "⏭  Sig. ejercicio",
+                                    color = if (restNextAction == "ejercicio") Color.White else Color.White.copy(alpha = 0.6f),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
                                 )
-                                .clickable { onToggleNextAction("ejercicio") }
-                                .padding(vertical = 12.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                "⏭  Sig. ejercicio",
-                                color = if (restNextAction == "ejercicio") Color.White else Color.White.copy(alpha = 0.6f),
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp
-                            )
+                            }
                         }
                     }
                 }

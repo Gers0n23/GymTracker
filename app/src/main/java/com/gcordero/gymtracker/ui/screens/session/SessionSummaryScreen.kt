@@ -22,6 +22,12 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.gcordero.gymtracker.domain.model.SetRecord
 import com.gcordero.gymtracker.domain.model.WorkoutSession
 import com.gcordero.gymtracker.ui.components.GlassCard
+import android.content.Context
+import androidx.compose.ui.platform.LocalContext
+import com.google.firebase.auth.FirebaseAuth
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import com.gcordero.gymtracker.ui.theme.GlassBorder
 import com.gcordero.gymtracker.ui.theme.Primary
 import com.gcordero.gymtracker.ui.theme.Secondary
@@ -40,6 +46,18 @@ fun SessionSummaryScreen(
     var sleepQuality by remember { mutableIntStateOf(3) }
     var energyLevel by remember { mutableIntStateOf(3) }
     var showResults by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
+    val userId = auth.currentUser?.uid ?: "default"
+    
+    // Calcular la proteína del día anterior guardada en SharedPreferences
+    val calendar = java.util.Calendar.getInstance()
+    calendar.add(java.util.Calendar.DAY_OF_YEAR, -1)
+    val yesterdayKey = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(calendar.time)
+    
+    val prefs = context.getSharedPreferences("body_prefs_$userId", Context.MODE_PRIVATE)
+    val previousDayProtein = prefs.getInt("protein_$yesterdayKey", 0)
 
     LaunchedEffect(session.id) {
         viewModel.loadSets(session.id)
@@ -254,7 +272,7 @@ fun SessionSummaryScreen(
                 item {
                     Button(
                         onClick = {
-                            viewModel.saveFinal(session, rpe.toInt(), sleepQuality, energyLevel)
+                            viewModel.saveFinal(session, rpe.toInt(), sleepQuality, energyLevel, previousDayProtein)
                             onFinish()
                         },
                         modifier = Modifier

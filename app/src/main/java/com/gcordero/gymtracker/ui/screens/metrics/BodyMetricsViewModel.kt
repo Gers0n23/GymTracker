@@ -2,15 +2,23 @@ package com.gcordero.gymtracker.ui.screens.metrics
 
 import android.app.Application
 import android.content.Context
+import android.graphics.Bitmap
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.gcordero.gymtracker.data.repository.BodyMetricsRepository
+import com.gcordero.gymtracker.data.repository.NutritionRepository
 import com.gcordero.gymtracker.domain.model.BodyMetric
+import com.gcordero.gymtracker.domain.model.NutritionLog
+import com.google.firebase.Firebase
+import com.google.firebase.ai.ai
+import com.google.firebase.ai.type.GenerativeBackend
+import com.google.firebase.ai.type.content
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -23,15 +31,37 @@ data class MacroRecommendation(
     val calories: Int
 )
 
+data class ScannedMacros(
+    val description: String,
+    val calories: Int,
+    val proteinG: Double,
+    val carbsG: Double,
+    val fatG: Double,
+    val fiberG: Double
+)
+
+sealed class ScanState {
+    data object Idle : ScanState()
+    data object Loading : ScanState()
+    data class Success(val result: ScannedMacros) : ScanState()
+    data class Error(val message: String) : ScanState()
+}
+
 class BodyMetricsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = BodyMetricsRepository()
-    private val auth   = FirebaseAuth.getInstance()
+    private val nutritionRepo = NutritionRepository()
+    private val auth = FirebaseAuth.getInstance()
     private val userId = auth.currentUser?.uid ?: "default"
 
-    // Preferencias separadas por usuario para que altura, edad, sexo y proteínas no se mezclen
     private val prefs = application.getSharedPreferences("body_prefs_$userId", Context.MODE_PRIVATE)
     private val todayKey = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(Date())
+
+    // Gemini model via Firebase AI Logic (Google AI backend)
+    private val generativeModel by lazy {
+        Firebase.ai(backend = GenerativeBackend.googleAI())
+            .generativeModel("gemini-2.5-flash")
+    }
 
     private val _metrics = MutableStateFlow<List<BodyMetric>>(emptyList())
     val metrics: StateFlow<List<BodyMetric>> = _metrics.asStateFlow()
@@ -52,23 +82,56 @@ class BodyMetricsViewModel(application: Application) : AndroidViewModel(applicat
     private val _isProfileSet = MutableStateFlow(prefs.getBoolean("profile_set", false))
     val isProfileSet: StateFlow<Boolean> = _isProfileSet.asStateFlow()
 
-    // ── Goal: "muscle" | "maintain" | "cut" ──────────────────────────────────
+    // ── Goal ─────────────────────────────────────────────────────────────────
     private val _goal = MutableStateFlow(prefs.getString("goal", "muscle") ?: "muscle")
     val goal: StateFlow<String> = _goal.asStateFlow()
 
-    // ── Today's protein tracker ───────────────────────────────────────────────
-    private val _todayProteinG = MutableStateFlow(prefs.getInt("protein_$todayKey", 0))
-    val todayProteinG: StateFlow<Int> = _todayProteinG.asStateFlow()
+    // ── Today's macros (SharedPreferences con clave de fecha) ─────────────────
+    // Prefijo "m_" para evitar colisión con la clave "protein_" que era Int en versión anterior
+    private val _todayProteinG = MutableStateFlow(prefs.getFloat("m_protein_$todayKey", 0f).toDouble())
+    val todayProteinG: StateFlow<Double> = _todayProteinG.asStateFlow()
 
-    init { loadMetrics() }
+    private val _todayCarbsG = MutableStateFlow(prefs.getFloat("m_carbs_$todayKey", 0f).toDouble())
+    val todayCarbsG: StateFlow<Double> = _todayCarbsG.asStateFlow()
+
+    private val _todayFatG = MutableStateFlow(prefs.getFloat("m_fat_$todayKey", 0f).toDouble())
+    val todayFatG: StateFlow<Double> = _todayFatG.asStateFlow()
+
+    private val _todayFiberG = MutableStateFlow(prefs.getFloat("m_fiber_$todayKey", 0f).toDouble())
+    val todayFiberG: StateFlow<Double> = _todayFiberG.asStateFlow()
+
+    private val _todayCalories = MutableStateFlow(prefs.getInt("m_calories_$todayKey", 0))
+    val todayCalories: StateFlow<Int> = _todayCalories.asStateFlow()
+
+    // ── Scan state ────────────────────────────────────────────────────────────
+    private val _scanState = MutableStateFlow<ScanState>(ScanState.Idle)
+    val scanState: StateFlow<ScanState> = _scanState.asStateFlow()
+
+    // ── Today's nutrition logs (Firestore) ────────────────────────────────────
+    private val _todayLogs = MutableStateFlow<List<NutritionLog>>(emptyList())
+    val todayLogs: StateFlow<List<NutritionLog>> = _todayLogs.asStateFlow()
+
+    init {
+        loadMetrics()
+        loadTodayLogs()
+    }
 
     private fun loadMetrics() {
-        val userId = auth.currentUser?.uid ?: "test_user"
+        val uid = auth.currentUser?.uid ?: "test_user"
         viewModelScope.launch {
             _isLoading.value = true
-            repository.getBodyMetrics(userId).collect {
+            repository.getBodyMetrics(uid).collect {
                 _metrics.value = it
                 _isLoading.value = false
+            }
+        }
+    }
+
+    private fun loadTodayLogs() {
+        val uid = auth.currentUser?.uid ?: "test_user"
+        viewModelScope.launch {
+            nutritionRepo.getTodayLogs(uid, todayKey).collect {
+                _todayLogs.value = it
             }
         }
     }
@@ -91,39 +154,134 @@ class BodyMetricsViewModel(application: Application) : AndroidViewModel(applicat
         prefs.edit().putString("goal", goal).apply()
     }
 
-    fun addProtein(grams: Int) {
-        val new = (_todayProteinG.value + grams).coerceAtLeast(0)
-        _todayProteinG.value = new
-        prefs.edit().putInt("protein_$todayKey", new).apply()
+    // ── Macro logging ─────────────────────────────────────────────────────────
+
+    fun logNutrition(macros: ScannedMacros) {
+        val uid = auth.currentUser?.uid ?: "test_user"
+        // Update local state
+        _todayProteinG.value  += macros.proteinG
+        _todayCarbsG.value    += macros.carbsG
+        _todayFatG.value      += macros.fatG
+        _todayFiberG.value    += macros.fiberG
+        _todayCalories.value  += macros.calories
+        // Persist locally
+        prefs.edit()
+            .putFloat("m_protein_$todayKey",  _todayProteinG.value.toFloat())
+            .putFloat("m_carbs_$todayKey",    _todayCarbsG.value.toFloat())
+            .putFloat("m_fat_$todayKey",      _todayFatG.value.toFloat())
+            .putFloat("m_fiber_$todayKey",    _todayFiberG.value.toFloat())
+            .putInt("m_calories_$todayKey",   _todayCalories.value)
+            .apply()
+        // Persist in Firestore
+        viewModelScope.launch {
+            nutritionRepo.addLog(
+                NutritionLog(
+                    userId      = uid,
+                    description = macros.description,
+                    calories    = macros.calories,
+                    proteinG    = macros.proteinG,
+                    carbsG      = macros.carbsG,
+                    fatG        = macros.fatG,
+                    fiberG      = macros.fiberG
+                ),
+                dateKey = todayKey
+            )
+        }
+        _scanState.value = ScanState.Idle
     }
 
-    fun resetProtein() {
-        _todayProteinG.value = 0
-        prefs.edit().putInt("protein_$todayKey", 0).apply()
+    fun addMacrosManual(proteinG: Double, carbsG: Double, fatG: Double, calories: Int, fiberG: Double = 0.0) {
+        logNutrition(ScannedMacros("Entrada manual", calories, proteinG, carbsG, fatG, fiberG))
+    }
+
+    fun resetTodayMacros() {
+        _todayProteinG.value = 0.0
+        _todayCarbsG.value   = 0.0
+        _todayFatG.value     = 0.0
+        _todayFiberG.value   = 0.0
+        _todayCalories.value = 0
+        prefs.edit()
+            .putFloat("m_protein_$todayKey",  0f)
+            .putFloat("m_carbs_$todayKey",    0f)
+            .putFloat("m_fat_$todayKey",      0f)
+            .putFloat("m_fiber_$todayKey",    0f)
+            .putInt("m_calories_$todayKey",   0)
+            .apply()
+    }
+
+    fun dismissScan() {
+        _scanState.value = ScanState.Idle
+    }
+
+    // ── Gemini food scan ──────────────────────────────────────────────────────
+
+    fun scanFood(bitmap: Bitmap) {
+        _scanState.value = ScanState.Loading
+        viewModelScope.launch {
+            runCatching {
+                val prompt = """
+                    Analiza esta imagen de comida y estima los macronutrientes totales del plato completo.
+                    Devuelve ÚNICAMENTE un JSON válido con este formato exacto, sin texto adicional ni bloques de código:
+                    {
+                      "descripcion": "nombre del plato",
+                      "calorias": 450,
+                      "proteina_g": 35.0,
+                      "carbohidratos_g": 45.0,
+                      "grasas_g": 12.0,
+                      "fibra_g": 4.0
+                    }
+                    Si no puedes identificar comida en la imagen, devuelve:
+                    {"error": "No se encontró comida en la imagen"}
+                """.trimIndent()
+
+                val response = generativeModel.generateContent(
+                    content {
+                        image(bitmap)
+                        text(prompt)
+                    }
+                )
+
+                val raw = response.text?.trim() ?: throw Exception("Respuesta vacía del modelo")
+                // Strip potential markdown code fences
+                val json = raw.removePrefix("```json").removePrefix("```").removeSuffix("```").trim()
+                val obj  = JSONObject(json)
+
+                if (obj.has("error")) throw Exception(obj.getString("error"))
+
+                ScannedMacros(
+                    description = obj.optString("descripcion", "Comida escaneada"),
+                    calories    = obj.optInt("calorias", 0),
+                    proteinG    = obj.optDouble("proteina_g", 0.0),
+                    carbsG      = obj.optDouble("carbohidratos_g", 0.0),
+                    fatG        = obj.optDouble("grasas_g", 0.0),
+                    fiberG      = obj.optDouble("fibra_g", 0.0)
+                )
+            }.onSuccess { result ->
+                _scanState.value = ScanState.Success(result)
+            }.onFailure { e ->
+                _scanState.value = ScanState.Error(e.message ?: "Error desconocido")
+            }
+        }
     }
 
     fun addMetric(weight: Double, fat: Double?, muscle: Double?) {
-        val userId = auth.currentUser?.uid ?: "test_user"
+        val uid    = auth.currentUser?.uid ?: "test_user"
         val heightM = if (_heightCm.value > 0) _heightCm.value / 100.0 else 1.75
-        val imc = weight / (heightM * heightM)
+        val imc     = weight / (heightM * heightM)
         viewModelScope.launch {
             repository.addBodyMetric(
                 BodyMetric(
-                    userId = userId,
-                    weightKg = weight,
-                    fatPercentage = fat,
+                    userId           = uid,
+                    weightKg         = weight,
+                    fatPercentage    = fat,
                     musclePercentage = muscle,
-                    imc = imc
+                    imc              = imc
                 )
             )
         }
     }
 
     companion object {
-        /**
-         * Calcula macros con Mifflin-St Jeor + ajuste por objetivo.
-         * Actividad moderada (×1.55) como base para usuarios de gimnasio.
-         */
         fun calculateMacros(
             weightKg: Double,
             heightCm: Int,
@@ -153,9 +311,9 @@ class BodyMetricsViewModel(application: Application) : AndroidViewModel(applicat
                 else     -> (weightKg * 1.8).roundToInt()
             }.coerceAtLeast(50)
 
-            val fatG = ((targetCal * 0.25) / 9).roundToInt().coerceAtLeast(30)
+            val fatG      = ((targetCal * 0.25) / 9).roundToInt().coerceAtLeast(30)
             val remaining = targetCal - (proteinG * 4) - (fatG * 9)
-            val carbsG = (remaining / 4).roundToInt().coerceAtLeast(0)
+            val carbsG    = (remaining / 4).roundToInt().coerceAtLeast(0)
 
             return MacroRecommendation(proteinG, carbsG, fatG, targetCal.roundToInt())
         }

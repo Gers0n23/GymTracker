@@ -51,8 +51,11 @@ fun RoutineDetailScreen(
     val routine by viewModel.routine.collectAsState()
     val exercises by viewModel.exercises.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val catalogExercises by viewModel.catalogExercises.collectAsState()
+    val catalogMuscleGroups by viewModel.catalogMuscleGroups.collectAsState()
+    val isCatalogLoading by viewModel.isCatalogLoading.collectAsState()
     
-    var showAddExerciseDialog by remember { mutableStateOf(false) }
+    var showExercisePicker by remember { mutableStateOf(false) }
     var showEditRoutineDialog by remember { mutableStateOf(false) }
     var exerciseToEdit by remember { mutableStateOf<Exercise?>(null) }
     var showDeleteRoutineConfirm by remember { mutableStateOf(false) }
@@ -99,7 +102,7 @@ fun RoutineDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showAddExerciseDialog = true }) {
+                    IconButton(onClick = { showExercisePicker = true }) {
                         Icon(Icons.Default.Add, contentDescription = "Añadir Ejercicio", tint = Primary)
                     }
                     Box {
@@ -192,12 +195,16 @@ fun RoutineDetailScreen(
         }
     }
 
-    if (showAddExerciseDialog) {
-        AddExerciseDialog(
-            onDismiss = { showAddExerciseDialog = false },
-            onConfirm = { name, muscle, media, targetSets, exerciseType ->
-                viewModel.addExercise(routineId, name, muscle, media, targetSets, exerciseType)
-                showAddExerciseDialog = false
+    // Picker del catálogo global de ejercicios
+    if (showExercisePicker) {
+        ExercisePickerBottomSheet(
+            exercises = catalogExercises,
+            muscleGroups = catalogMuscleGroups,
+            isLoading = isCatalogLoading,
+            onDismiss = { showExercisePicker = false },
+            onConfirm = { catalogExercise, targetSets, initialWeight ->
+                viewModel.addExerciseFromCatalog(routineId, catalogExercise, targetSets, initialWeight)
+                showExercisePicker = false
             }
         )
     }

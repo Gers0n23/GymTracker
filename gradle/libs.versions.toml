@@ -36,6 +36,7 @@ firebase-auth-ktx = { group = "com.google.firebase", name = "firebase-auth-ktx" 
 firebase-firestore-ktx = { group = "com.google.firebase", name = "firebase-firestore-ktx" }
 firebase-analytics-ktx = { group = "com.google.firebase", name = "firebase-analytics-ktx" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
+firebase-ai = { group = "com.google.firebase", name = "firebase-ai", version = "17.10.0" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -4,7 +4,9 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.gcordero.gymtracker.data.repository.ExerciseCatalogRepository
 import com.gcordero.gymtracker.data.util.DataPopulator
+import com.gcordero.gymtracker.data.util.ExerciseCatalogSeeder
 import com.gcordero.gymtracker.domain.model.Exercise
 import com.gcordero.gymtracker.domain.model.ExerciseType
 import com.gcordero.gymtracker.domain.model.Routine
@@ -67,6 +69,8 @@ class OnboardingViewModel(application: Application) : AndroidViewModel(applicati
                     OnboardingPlan.FULL_BODY -> createFullBodyRoutine(userId)
                     OnboardingPlan.NONE      -> Unit
                 }
+                // Pobla el catálogo global de ejercicios si está vacío (solo se ejecuta una vez, es global)
+                ExerciseCatalogSeeder.seedIfEmpty(ExerciseCatalogRepository())
                 _uiState.update { it.copy(isLoading = false, isDone = true) }
             } catch (e: Exception) {
                 _uiState.update { it.copy(isLoading = false, error = e.message ?: "Error desconocido") }

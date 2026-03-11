@@ -1,5 +1,10 @@
 package com.gcordero.gymtracker.ui.screens.metrics
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -24,13 +29,19 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.gcordero.gymtracker.data.repository.ExerciseCatalogRepository
+import com.gcordero.gymtracker.data.util.ExerciseCatalogSeeder
+import kotlinx.coroutines.launch
 import com.gcordero.gymtracker.domain.model.BodyMetric
+import com.gcordero.gymtracker.domain.model.NutritionLog
 import com.gcordero.gymtracker.ui.components.GlassCard
 import com.gcordero.gymtracker.ui.theme.AmberAccent
 import com.gcordero.gymtracker.ui.theme.GreenAccent
@@ -62,6 +73,7 @@ private fun fmtDate(metric: BodyMetric) =
 fun BodyMetricsScreen(
     viewModel: BodyMetricsViewModel = viewModel()
 ) {
+    val context      = LocalContext.current
     val metrics      by viewModel.metrics.collectAsState()
     val isLoading    by viewModel.isLoading.collectAsState()
     val heightCm     by viewModel.heightCm.collectAsState()
@@ -69,11 +81,20 @@ fun BodyMetricsScreen(
     val isMale       by viewModel.isMale.collectAsState()
     val isProfileSet by viewModel.isProfileSet.collectAsState()
     val goal         by viewModel.goal.collectAsState()
-    val todayProtein by viewModel.todayProteinG.collectAsState()
+    val scanState    by viewModel.scanState.collectAsState()
+    val todayLogs    by viewModel.todayLogs.collectAsState()
 
-    var showAddDialog          by remember { mutableStateOf(false) }
-    var showProfileDialog      by remember { mutableStateOf(false) }
-    var showCustomProteinDialog by remember { mutableStateOf(false) }
+    // Today's macros
+    val todayProtein  by viewModel.todayProteinG.collectAsState()
+    val todayCarbs    by viewModel.todayCarbsG.collectAsState()
+    val todayFat      by viewModel.todayFatG.collectAsState()
+    val todayFiber    by viewModel.todayFiberG.collectAsState()
+    val todayCalories by viewModel.todayCalories.collectAsState()
+
+    var showAddDialog           by remember { mutableStateOf(false) }
+    var showProfileDialog       by remember { mutableStateOf(false) }
+    var showManualMacroDialog   by remember { mutableStateOf(false) }
+    var showImageSourceSheet    by remember { mutableStateOf(false) }
 
     val latestMetric   = metrics.firstOrNull()
     val previousMetric = metrics.getOrNull(1)
@@ -87,6 +108,34 @@ fun BodyMetricsScreen(
 
     LaunchedEffect(isProfileSet) {
         if (!isProfileSet) showProfileDialog = true
+    }
+
+    // ── Camera launcher (returns Bitmap preview directly, no FileProvider needed) ──
+    val cameraLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        bitmap?.let { viewModel.scanFood(it) }
+    }
+
+    // ── Gallery launcher ──────────────────────────────────────────────────────
+    val galleryLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let {
+            runCatching {
+                val bmp = android.graphics.BitmapFactory.decodeStream(
+                    context.contentResolver.openInputStream(uri)
+                )
+                bmp?.let { viewModel.scanFood(it) }
+            }
+        }
+    }
+
+    // ── Camera permission launcher ────────────────────────────────────────────
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) cameraLauncher.launch(null)
     }
 
     Scaffold(
@@ -152,21 +201,37 @@ fun BodyMetricsScreen(
                     item { ProfileMissingBanner(onClick = { showProfileDialog = true }) }
                 }
 
-                // ── Macros ────────────────────────────────────────────────
+                // ── Macros recomendados ───────────────────────────────────
                 item { SectionHeader("MACROS RECOMENDADOS") }
                 item { GoalSelector(selected = goal, onSelect = { viewModel.setGoal(it) }) }
                 item { MacrosRow(macros = macros) }
 
-                // ── Protein tracker ───────────────────────────────────────
-                item { SectionHeader("PROTEÍNA DEL DÍA") }
+                // ── Nutrición de hoy ──────────────────────────────────────
+                item { SectionHeader("NUTRICIÓN DE HOY") }
                 item {
-                    ProteinTrackerCard(
-                        consumed = todayProtein,
-                        goal     = macros.proteinG,
-                        onQuickAdd   = { viewModel.addProtein(it) },
-                        onCustomAdd  = { showCustomProteinDialog = true },
-                        onReset      = { viewModel.resetProtein() }
+                    NutritionTodayCard(
+                        calories     = todayCalories,
+                        proteinG     = todayProtein,
+                        carbsG       = todayCarbs,
+                        fatG         = todayFat,
+                        fiberG       = todayFiber,
+                        targetCal    = macros.calories,
+                        targetProtein = macros.proteinG,
+                        targetCarbs  = macros.carbsG,
+                        targetFat    = macros.fatG,
+                        onScanClick  = { showImageSourceSheet = true },
+                        onManualClick = { showManualMacroDialog = true },
+                        onReset      = { viewModel.resetTodayMacros() },
+                        scanState    = scanState
                     )
+                }
+
+                // ── Historial de comidas del día ──────────────────────────
+                if (todayLogs.isNotEmpty()) {
+                    item { SectionHeader("COMIDAS REGISTRADAS HOY") }
+                    items(todayLogs) { log ->
+                        NutritionLogItem(log = log)
+                    }
                 }
 
                 // ── Weight chart ──────────────────────────────────────────
@@ -190,7 +255,48 @@ fun BodyMetricsScreen(
         }
     }
 
-    // ── Dialogs ───────────────────────────────────────────────────────────────
+    // ── Image source bottom sheet ─────────────────────────────────────────────
+    if (showImageSourceSheet) {
+        ImageSourceSheet(
+            onDismiss  = { showImageSourceSheet = false },
+            onCamera   = {
+                showImageSourceSheet = false
+                val hasPermission = ContextCompat.checkSelfPermission(
+                    context, Manifest.permission.CAMERA
+                ) == PackageManager.PERMISSION_GRANTED
+                if (hasPermission) cameraLauncher.launch(null)
+                else cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            },
+            onGallery  = {
+                showImageSourceSheet = false
+                galleryLauncher.launch("image/*")
+            }
+        )
+    }
+
+    // ── Scan result dialog ────────────────────────────────────────────────────
+    if (scanState is ScanState.Success) {
+        ScanResultDialog(
+            result    = (scanState as ScanState.Success).result,
+            onConfirm = { viewModel.logNutrition(it) },
+            onDismiss = { viewModel.dismissScan() }
+        )
+    }
+    if (scanState is ScanState.Error) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissScan() },
+            title = { Text("Error al escanear") },
+            text  = { Text((scanState as ScanState.Error).message) },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.dismissScan() },
+                    colors  = ButtonDefaults.buttonColors(containerColor = Primary)
+                ) { Text("OK", color = Color.Black) }
+            }
+        )
+    }
+
+    // ── Standard dialogs ──────────────────────────────────────────────────────
     if (showProfileDialog) {
         ProfileSetupDialog(
             currentHeightCm = heightCm,
@@ -212,12 +318,12 @@ fun BodyMetricsScreen(
             }
         )
     }
-    if (showCustomProteinDialog) {
-        CustomProteinDialog(
-            onDismiss = { showCustomProteinDialog = false },
-            onConfirm = { grams ->
-                viewModel.addProtein(grams)
-                showCustomProteinDialog = false
+    if (showManualMacroDialog) {
+        ManualMacroDialog(
+            onDismiss = { showManualMacroDialog = false },
+            onConfirm = { p, c, f, kcal, fiber ->
+                viewModel.addMacrosManual(p, c, f, kcal, fiber)
+                showManualMacroDialog = false
             }
         )
     }
@@ -305,16 +411,12 @@ private fun HeroMetricCard(latest: BodyMetric, previous: BodyMetric?) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
-            // Header: Fecha y Diferencia
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    color = PrimaryDim,
-                    shape = RoundedCornerShape(8.dp)
-                ) {
+                Surface(color = PrimaryDim, shape = RoundedCornerShape(8.dp)) {
                     Text(
                         text = "ÚLTIMA MEDICIÓN · ${fmtDate(latest)}".uppercase(),
                         fontSize = 10.sp,
@@ -324,13 +426,9 @@ private fun HeroMetricCard(latest: BodyMetric, previous: BodyMetric?) {
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                     )
                 }
-
                 if (delta != null) {
                     val deltaColor = if (deltaUp) RedAccent else GreenAccent
-                    Surface(
-                        color = deltaColor.copy(alpha = 0.15f),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
+                    Surface(color = deltaColor.copy(alpha = 0.15f), shape = RoundedCornerShape(8.dp)) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
@@ -342,18 +440,12 @@ private fun HeroMetricCard(latest: BodyMetric, previous: BodyMetric?) {
                                 modifier = Modifier.size(16.dp)
                             )
                             Spacer(Modifier.width(2.dp))
-                            Text(
-                                text = "%.1f kg".format(abs(delta)),
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = deltaColor
-                            )
+                            Text("%.1f kg".format(abs(delta)), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = deltaColor)
                         }
                     }
                 }
             }
 
-            // Central Weight
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     text = "%.1f kg".format(latest.weightKg),
@@ -365,12 +457,7 @@ private fun HeroMetricCard(latest: BodyMetric, previous: BodyMetric?) {
                 )
             }
 
-            // 3 Bottom Metrics
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // IMC
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 MetricMiniCard(
                     modifier = Modifier.weight(1f),
                     emoji = if (imcValue > 0) "📉" else "➖",
@@ -378,8 +465,6 @@ private fun HeroMetricCard(latest: BodyMetric, previous: BodyMetric?) {
                     label = imcLabel,
                     color = imcColor
                 )
-
-                // Músculo
                 MetricMiniCard(
                     modifier = Modifier.weight(1f),
                     emoji = "💪",
@@ -387,8 +472,6 @@ private fun HeroMetricCard(latest: BodyMetric, previous: BodyMetric?) {
                     label = "Músculo",
                     color = if (musclePct != null) Primary else Color.Gray
                 )
-
-                // Grasa
                 MetricMiniCard(
                     modifier = Modifier.weight(1f),
                     emoji = "📊",
@@ -455,16 +538,11 @@ private fun GoalSelector(selected: String, onSelect: (String) -> Unit) {
         Triple("maintain", "⚖️", "Mante-\nnimiento"),
         Triple("cut",      "🔥", "Perder\nGrasa")
     )
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         goals.forEach { (id, emoji, label) ->
             val isSelected = selected == id
             Surface(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onSelect(id) },
+                modifier = Modifier.weight(1f).clickable { onSelect(id) },
                 color  = if (isSelected) PrimaryDim else Color.White.copy(alpha = 0.04f),
                 shape  = RoundedCornerShape(10.dp),
                 border = BorderStroke(
@@ -496,14 +574,11 @@ private fun GoalSelector(selected: String, onSelect: (String) -> Unit) {
 
 @Composable
 private fun MacrosRow(macros: MacroRecommendation) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        MacroCard(Modifier.weight(1f), "🥩", "${macros.proteinG}g",   "Proteína", Color(0xFFFF7043))
-        MacroCard(Modifier.weight(1f), "🌾", "${macros.carbsG}g",    "Carbos",   AmberAccent)
-        MacroCard(Modifier.weight(1f), "🥑", "${macros.fatG}g",      "Grasas",   GreenAccent)
-        MacroCard(Modifier.weight(1f), "🔥", "${macros.calories}",   "kcal/día", Primary)
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        MacroCard(Modifier.weight(1f), "🥩", "${macros.proteinG}g",  "Proteína", Color(0xFFFF7043))
+        MacroCard(Modifier.weight(1f), "🌾", "${macros.carbsG}g",   "Carbos",   AmberAccent)
+        MacroCard(Modifier.weight(1f), "🥑", "${macros.fatG}g",     "Grasas",   GreenAccent)
+        MacroCard(Modifier.weight(1f), "🔥", "${macros.calories}",  "kcal/día", Primary)
     }
 }
 
@@ -526,119 +601,133 @@ private fun MacroCard(modifier: Modifier, emoji: String, value: String, label: S
     }
 }
 
-// ── Protein tracker ───────────────────────────────────────────────────────────
+// ── Nutrition today card ──────────────────────────────────────────────────────
 
 @Composable
-private fun ProteinTrackerCard(
-    consumed: Int,
-    goal: Int,
-    onQuickAdd:  (Int) -> Unit,
-    onCustomAdd: () -> Unit,
-    onReset:     () -> Unit
+private fun NutritionTodayCard(
+    calories: Int,
+    proteinG: Double,
+    carbsG: Double,
+    fatG: Double,
+    fiberG: Double,
+    targetCal: Int,
+    targetProtein: Int,
+    targetCarbs: Int,
+    targetFat: Int,
+    onScanClick: () -> Unit,
+    onManualClick: () -> Unit,
+    onReset: () -> Unit,
+    scanState: ScanState
 ) {
-    val progress = if (goal > 0) consumed.toFloat() / goal else 0f
-    val progressColor = when {
-        progress >= 0.8f -> GreenAccent
-        progress >= 0.5f -> AmberAccent
-        else             -> RedAccent
-    }
+    val calProgress     = if (targetCal > 0) (calories.toFloat() / targetCal).coerceIn(0f, 1f) else 0f
+    val proteinProgress = if (targetProtein > 0) (proteinG.toFloat() / targetProtein).coerceIn(0f, 1f) else 0f
+    val carbsProgress   = if (targetCarbs > 0) (carbsG.toFloat() / targetCarbs).coerceIn(0f, 1f) else 0f
+    val fatProgress     = if (targetFat > 0) (fatG.toFloat() / targetFat).coerceIn(0f, 1f) else 0f
 
     GlassCard(
         modifier = Modifier.fillMaxWidth(),
         padding = 16.dp,
         containerColor = Color(0xFF16162A),
-        borderColor = progressColor.copy(alpha = 0.28f)
+        borderColor = Primary.copy(alpha = 0.22f)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
 
-            // Header
+            // Header + action buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.Bottom,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
+                    Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            text = "${consumed}g",
+                            text = "$calories",
                             fontSize = 30.sp,
                             fontWeight = FontWeight.ExtraBold,
-                            color = progressColor,
+                            color = Primary,
                             lineHeight = 30.sp
                         )
                         Text(
-                            text = "/ ${goal}g",
+                            text = "/ $targetCal kcal",
                             fontSize = 14.sp,
                             color = Color(0xFF888888),
                             modifier = Modifier.padding(bottom = 4.dp)
                         )
                     }
-                    Text("proteína consumida hoy", fontSize = 11.sp, color = Color(0xFF666666))
+                    Text("calorías consumidas hoy", fontSize = 11.sp, color = Color(0xFF666666))
                 }
                 Surface(
-                    color = progressColor.copy(alpha = 0.12f),
+                    color = Primary.copy(alpha = 0.12f),
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(
-                        text = "${(progress * 100).roundToInt()}%",
+                        text = "${(calProgress * 100).roundToInt()}%",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.ExtraBold,
-                        color = progressColor,
+                        color = Primary,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
                     )
                 }
             }
 
-            // Progress bar
+            // Calories progress bar
             LinearProgressIndicator(
-                progress = { progress.coerceIn(0f, 1f) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(8.dp)
-                    .clip(RoundedCornerShape(4.dp)),
-                color = progressColor,
+                progress = { calProgress },
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                color = Primary,
                 trackColor = Color.White.copy(alpha = 0.07f)
             )
 
-            // Quick-add + reset row
+            // Macro progress rows
+            MacroProgressRow("🥩 Proteína", proteinG, targetProtein.toDouble(), "g", Color(0xFFFF7043), proteinProgress)
+            MacroProgressRow("🌾 Carbos",   carbsG,   targetCarbs.toDouble(),   "g", AmberAccent,      carbsProgress)
+            MacroProgressRow("🥑 Grasas",   fatG,     targetFat.toDouble(),     "g", GreenAccent,      fatProgress)
+            if (fiberG > 0) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("🌿 Fibra", fontSize = 12.sp, color = Color(0xFF888888))
+                    Text("%.1fg".format(fiberG), fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF4CAF50))
+                }
+            }
+
+            // Action buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                listOf(10, 20, 30, 50).forEach { g ->
-                    Surface(
-                        modifier = Modifier.clickable { onQuickAdd(g) },
-                        color = Color.White.copy(alpha = 0.07f),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "+${g}g",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFFCCCCCC),
-                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                // Scan food button
+                Button(
+                    onClick = onScanClick,
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
+                    enabled = scanState !is ScanState.Loading
+                ) {
+                    if (scanState is ScanState.Loading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color.Black,
+                            strokeWidth = 2.dp
                         )
+                        Spacer(Modifier.width(6.dp))
+                        Text("Analizando...", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                    } else {
+                        Icon(Icons.Default.CameraAlt, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Escanear comida", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     }
                 }
-                Spacer(Modifier.weight(1f))
-                // Custom amount
-                Surface(
-                    modifier = Modifier.clickable { onCustomAdd() },
-                    color = PrimaryDim,
-                    shape = RoundedCornerShape(8.dp)
+                // Manual entry
+                OutlinedButton(
+                    onClick = onManualClick,
+                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp)
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                        horizontalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, tint = Primary, modifier = Modifier.size(12.dp))
-                        Text("Otro", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Primary)
-                    }
+                    Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(14.dp), tint = Color(0xFF888888))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Manual", fontSize = 13.sp, color = Color(0xFF888888))
                 }
                 // Reset
                 Surface(
@@ -650,12 +739,267 @@ private fun ProteinTrackerCard(
                         text = "↺",
                         fontSize = 15.sp,
                         color = Color(0xFF555555),
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
                     )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun MacroProgressRow(
+    label: String,
+    current: Double,
+    target: Double,
+    unit: String,
+    color: Color,
+    progress: Float
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, fontSize = 12.sp, color = Color(0xFF888888))
+            Text(
+                "%.0f / %.0f%s".format(current, target, unit),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = color
+            )
+        }
+        LinearProgressIndicator(
+            progress = { progress },
+            modifier = Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(3.dp)),
+            color = color,
+            trackColor = Color.White.copy(alpha = 0.07f)
+        )
+    }
+}
+
+// ── Nutrition log item ────────────────────────────────────────────────────────
+
+@Composable
+private fun NutritionLogItem(log: NutritionLog) {
+    GlassCard(
+        modifier = Modifier.fillMaxWidth(),
+        padding = 12.dp,
+        containerColor = Color(0xFF13131F),
+        borderColor = Color.White.copy(alpha = 0.07f)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Surface(color = PrimaryDim, shape = RoundedCornerShape(7.dp)) {
+                    Text(
+                        text = "🍽",
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp)
+                    )
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(
+                        log.description.replaceFirstChar { it.uppercase() },
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        "P: %.0fg  C: %.0fg  G: %.0fg".format(log.proteinG, log.carbsG, log.fatG),
+                        fontSize = 10.sp,
+                        color = Color(0xFF888888)
+                    )
+                }
+            }
+            Text(
+                "${log.calories} kcal",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Primary
+            )
+        }
+    }
+}
+
+// ── Image source bottom sheet ─────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ImageSourceSheet(
+    onDismiss: () -> Unit,
+    onCamera: () -> Unit,
+    onGallery: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = Color(0xFF1A1A2E)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                "Escanear comida con IA",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+            Text(
+                "Toma una foto o selecciona una imagen y Gemini estimará los macronutrientes.",
+                fontSize = 12.sp,
+                color = Color(0xFF888888),
+                lineHeight = 16.sp
+            )
+            Spacer(Modifier.height(4.dp))
+            Button(
+                onClick = onCamera,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+            ) {
+                Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Usar cámara", fontWeight = FontWeight.Bold, color = Color.Black)
+            }
+            OutlinedButton(
+                onClick = onGallery,
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, Primary.copy(alpha = 0.4f))
+            ) {
+                Icon(Icons.Default.Photo, contentDescription = null, tint = Primary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Elegir de galería", color = Primary)
+            }
+        }
+    }
+}
+
+// ── Scan result dialog ────────────────────────────────────────────────────────
+
+@Composable
+private fun ScanResultDialog(
+    result: ScannedMacros,
+    onConfirm: (ScannedMacros) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = { /* bloqueado — usar botones */ },
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Comida detectada", fontWeight = FontWeight.Bold)
+                Text(
+                    result.description.replaceFirstChar { it.uppercase() },
+                    fontSize = 13.sp,
+                    color = Primary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "Macronutrientes estimados por Gemini:",
+                    fontSize = 12.sp,
+                    color = Color(0xFF888888)
+                )
+                ScanResultRow("🔥 Calorías",      "${result.calories} kcal",     Primary)
+                ScanResultRow("🥩 Proteína",       "%.1fg".format(result.proteinG), Color(0xFFFF7043))
+                ScanResultRow("🌾 Carbohidratos",  "%.1fg".format(result.carbsG),   AmberAccent)
+                ScanResultRow("🥑 Grasas",         "%.1fg".format(result.fatG),     GreenAccent)
+                if (result.fiberG > 0) {
+                    ScanResultRow("🌿 Fibra",      "%.1fg".format(result.fiberG),   Color(0xFF4CAF50))
+                }
+                Text(
+                    "⚠️ Valores estimados. Pueden variar según el tamaño de la porción.",
+                    fontSize = 10.sp,
+                    color = Color(0xFF666666),
+                    lineHeight = 13.sp
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(result) },
+                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+            ) { Text("Agregar al día", color = Color.Black, fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
+}
+
+@Composable
+private fun ScanResultRow(label: String, value: String, color: Color) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, fontSize = 13.sp, color = Color(0xFFCCCCCC))
+        Text(value, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = color)
+    }
+}
+
+// ── Manual macro dialog ───────────────────────────────────────────────────────
+
+@Composable
+private fun ManualMacroDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (proteinG: Double, carbsG: Double, fatG: Double, calories: Int, fiberG: Double) -> Unit
+) {
+    var protein  by remember { mutableStateOf("") }
+    var carbs    by remember { mutableStateOf("") }
+    var fat      by remember { mutableStateOf("") }
+    var calories by remember { mutableStateOf("") }
+    var fiber    by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Agregar macros manualmente") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                MacroTextField("🔥 Calorías (kcal)", calories) { calories = it }
+                MacroTextField("🥩 Proteína (g)",    protein)  { protein = it }
+                MacroTextField("🌾 Carbohidratos (g)", carbs)  { carbs = it }
+                MacroTextField("🥑 Grasas (g)",       fat)     { fat = it }
+                MacroTextField("🌿 Fibra (g) — opcional", fiber) { fiber = it }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val p  = protein.toDoubleOrNull()  ?: 0.0
+                    val c  = carbs.toDoubleOrNull()    ?: 0.0
+                    val f  = fat.toDoubleOrNull()      ?: 0.0
+                    val fi = fiber.toDoubleOrNull()    ?: 0.0
+                    val kcal = calories.toIntOrNull()
+                        ?: ((p * 4) + (c * 4) + (f * 9)).roundToInt()
+                    onConfirm(p, c, f, kcal, fi)
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+            ) { Text("Agregar", color = Color.Black) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
+}
+
+@Composable
+private fun MacroTextField(label: String, value: String, onChange: (String) -> Unit) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label, fontSize = 12.sp) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+        modifier = Modifier.fillMaxWidth(),
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Primary, focusedLabelColor = Primary)
+    )
 }
 
 // ── Weight chart ──────────────────────────────────────────────────────────────
@@ -674,16 +1018,11 @@ private fun WeightChartCard(metrics: List<BodyMetric>) {
         borderColor = Primary.copy(alpha = 0.18f)
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-
-            // Min / max row
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("Mín  ${"%.1f".format(minW)} kg", fontSize = 10.sp, color = GreenAccent)
                 Text("Máx  ${"%.1f".format(maxW)} kg", fontSize = 10.sp, color = AmberAccent)
             }
-
             WeightLineChart(chartPoints = chartPoints)
-
-            // Date labels (first, middle, last)
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 val n = chartPoints.size
                 chartPoints.forEachIndexed { i, metric ->
@@ -719,7 +1058,6 @@ private fun WeightLineChart(chartPoints: List<BodyMetric>) {
             )
         }
 
-        // Gradient fill under curve
         val fillPath = Path().apply {
             moveTo(points.first().x, h)
             points.forEach { lineTo(it.x, it.y) }
@@ -734,7 +1072,6 @@ private fun WeightLineChart(chartPoints: List<BodyMetric>) {
             )
         )
 
-        // Line
         val linePath = Path().apply {
             moveTo(points.first().x, points.first().y)
             points.drop(1).forEach { lineTo(it.x, it.y) }
@@ -745,7 +1082,6 @@ private fun WeightLineChart(chartPoints: List<BodyMetric>) {
             style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
         )
 
-        // Dots
         points.forEach { pt ->
             drawCircle(color = Primary, radius = 3.5.dp.toPx(), center = pt)
             drawCircle(color = Color(0xFF16162A), radius = 1.8.dp.toPx(), center = pt)
@@ -817,6 +1153,9 @@ private fun ProfileSetupDialog(
     var ageText    by remember { mutableStateOf(if (currentAge > 0)      "$currentAge"      else "") }
     var isMale     by remember { mutableStateOf(currentIsMale) }
 
+    var seedStatus by remember { mutableStateOf("idle") }
+    val scope = rememberCoroutineScope()
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Tu Perfil") },
@@ -846,7 +1185,6 @@ private fun ProfileSetupDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Primary, focusedLabelColor = Primary)
                 )
-                // Sex selector
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(true to "♂  Hombre", false to "♀  Mujer").forEach { (male, label) ->
                         val sel = isMale == male
@@ -866,6 +1204,43 @@ private fun ProfileSetupDialog(
                             )
                         }
                     }
+                }
+
+                HorizontalDivider(color = Color.White.copy(alpha = 0.07f))
+                Text(
+                    "HERRAMIENTAS",
+                    fontSize = 9.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF555555),
+                    letterSpacing = 1.5.sp
+                )
+
+                val (seedLabel, seedColor, seedEnabled) = when (seedStatus) {
+                    "loading" -> Triple("Poblando catálogo...", Color(0xFF888888), false)
+                    "ok"      -> Triple("✓ Catálogo listo", GreenAccent, false)
+                    "error"   -> Triple("⚠️ Error — reintentar", RedAccent, true)
+                    else      -> Triple("🏋️  Poblar catálogo de ejercicios", Primary, true)
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        scope.launch {
+                            seedStatus = "loading"
+                            val result = ExerciseCatalogSeeder.seedIfEmpty(ExerciseCatalogRepository())
+                            seedStatus = if (result.isSuccess) "ok" else "error"
+                        }
+                    },
+                    enabled = seedEnabled,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    border = BorderStroke(1.dp, seedColor.copy(alpha = 0.4f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = seedColor)
+                ) {
+                    if (seedStatus == "loading") {
+                        CircularProgressIndicator(modifier = Modifier.size(14.dp), color = seedColor, strokeWidth = 2.dp)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Text(seedLabel, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
             }
         },
@@ -938,41 +1313,6 @@ fun AddMetricDialog(
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Primary)
             ) { Text("Guardar", color = Color.Black) }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancelar") }
-        }
-    )
-}
-
-@Composable
-private fun CustomProteinDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (Int) -> Unit
-) {
-    var text by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Añadir Proteína") },
-        text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text("Gramos de proteína") },
-                placeholder = { Text("Ej: 45") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth(),
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Primary, focusedLabelColor = Primary)
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val g = text.toIntOrNull()
-                    if (g != null && g > 0) onConfirm(g)
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Primary)
-            ) { Text("Añadir", color = Color.Black) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancelar") }

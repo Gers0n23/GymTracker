@@ -205,13 +205,14 @@ fun ActiveSessionScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         exercises.forEachIndexed { index, ex ->
-                            val isDone = index < currentIndex
+                            val currentSets = sets[ex.id] ?: emptyList()
+                            val isDone = currentSets.isNotEmpty() && index != currentIndex
                             val isActive = index == currentIndex
                             ExerciseSelectorPill(
                                 name = ex.name,
                                 isActive = isActive,
                                 isDone = isDone,
-                                onClick = { }
+                                onClick = { viewModel.selectExercise(index) }
                             )
                         }
                     }
@@ -227,10 +228,13 @@ fun ActiveSessionScreen(
                         exercise = currentExercise,
                         setNumber = currentSetNum,
                         totalSets = totalSets,
+                        actualSetsCount = currentExerciseSets.size,
                         currentSetRecord = currentSet,
                         previousSetRecord = previousSetRecord,
                         isLastExercise = isLastExercise,
                         modifier = Modifier.weight(1f),
+                        onSelectSet = { viewModel.selectSet(it) },
+                        onReturnToLatest = { viewModel.returnToLatestSet() },
                         onUpdateStrengthSet = { weight, reps, rir ->
                             viewModel.updateSet(currentExercise.id, currentSetNum - 1, weight, reps, rir)
                         },
@@ -254,6 +258,7 @@ fun ActiveSessionScreen(
             RestOverlay(
                 secondsLeft = restTimer,
                 onSkip = { viewModel.skipRest() },
+                onAdjustTime = { delta -> viewModel.adjustRestTime(delta) },
                 nextSetInfo = when (currentExercise?.type) {
                     ExerciseType.TIMED -> "Serie ${currentSetNum + 1} • ${currentSet?.durationSeconds ?: 0}s"
                     ExerciseType.CARDIO -> currentExercise.name
@@ -319,10 +324,13 @@ fun ActiveExerciseFocusCard(
     exercise: Exercise,
     setNumber: Int,
     totalSets: Int,
+    actualSetsCount: Int,
     currentSetRecord: SetRecord?,
     previousSetRecord: SetRecord? = null,
     isLastExercise: Boolean = false,
     modifier: Modifier = Modifier,
+    onSelectSet: (Int) -> Unit = {},
+    onReturnToLatest: () -> Unit = {},
     onUpdateStrengthSet: (weight: Double, reps: Int, rir: Int?) -> Unit = { _, _, _ -> },
     onUpdateTimedSet: (durationSeconds: Int) -> Unit = { _ -> },
     onUpdateCardioSet: (speedKmh: Double, inclinePercent: Double, durationSeconds: Int) -> Unit = { _, _, _ -> },
@@ -333,7 +341,7 @@ fun ActiveExerciseFocusCard(
     val context = LocalContext.current
     val exerciseType = exercise.type
     val targetSets = exercise.targetSets.coerceAtLeast(1)
-    val isLastTargetSet = setNumber >= targetSets
+    val isEditingPastSet = setNumber < actualSetsCount
 
     // ---- Estado para STRENGTH ----
     val initialWeight = currentSetRecord?.weight?.takeIf { it > 0 }
@@ -451,7 +459,7 @@ fun ActiveExerciseFocusCard(
                 }
             }
 
-            // Badge de serie (CARDIO muestra "SESIÓN DE CARDIO")
+            // Badge de serie y selector (CARDIO muestra "SESIÓN DE CARDIO")
             when (exerciseType) {
                 ExerciseType.CARDIO -> {
                     Surface(color = Color(0xFF1565C0), shape = RoundedCornerShape(12.dp)) {
@@ -465,17 +473,66 @@ fun ActiveExerciseFocusCard(
                     }
                 }
                 else -> {
-                    Surface(
-                        color = if (isLastTargetSet) Color(0xFF4CAF50) else Primary,
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text(
-                            if (isLastTargetSet) "★  SERIE $setNumber DE $totalSets" else "SERIE $setNumber DE $totalSets",
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
-                            color = if (isLastTargetSet) Color.White else Color.Black,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Surface(
+                            color = if (!isEditingPastSet && setNumber >= targetSets) Color(0xFF4CAF50) 
+                                    else if (isEditingPastSet) Color(0xFFF57C00) else Primary,
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(
+                                if (isEditingPastSet) "EDITANDO SERIE $setNumber" 
+                                else if (setNumber >= targetSets) "★  SERIE $setNumber" else "SERIE $setNumber",
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp),
+                                color = if (!isEditingPastSet && setNumber >= targetSets) Color.White 
+                                        else if (isEditingPastSet) Color.White else Color.Black,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 12.sp
+                            )
+                        }
+                        
+                        // Serie Selector
+                        if (actualSetsCount > 0) {
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                for (i in 1..actualSetsCount + 1) {
+                                    val isCurrentActive = i == setNumber
+                                    val isFuture = i > actualSetsCount
+                                    
+                                    Box(
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .clip(androidx.compose.foundation.shape.CircleShape)
+                                            .background(
+                                                when {
+                                                    isCurrentActive && isFuture -> Primary
+                                                    isCurrentActive -> Color(0xFFF57C00)
+                                                    isFuture -> Glass
+                                                    else -> Primary.copy(alpha = 0.3f)
+                                                }
+                                            )
+                                            .border(
+                                                1.dp,
+                                                if (isCurrentActive) Color.White else Color.Transparent,
+                                                androidx.compose.foundation.shape.CircleShape
+                                            )
+                                            .clickable(enabled = !isCurrentActive) {
+                                                if (isFuture) onReturnToLatest() else onSelectSet(i)
+                                            },
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            if (isFuture) "+" else "$i",
+                                            color = if (isCurrentActive && isFuture) Color.Black else Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 14.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -616,22 +673,28 @@ fun ActiveExerciseFocusCard(
                                 inclineText.toDoubleOrNull() ?: 0.0,
                                 ((cardioDurationText.toDoubleOrNull() ?: 0.0) * 60).toInt()
                             )
-                            if (isLastExercise) onFinishSession() else onFinishExercise()
+                            if (isEditingPastSet) {
+                                onReturnToLatest()
+                            } else {
+                                if (isLastExercise) onFinishSession() else onFinishExercise()
+                            }
                         },
                         modifier = Modifier.fillMaxWidth().height(60.dp),
                         shape = RoundedCornerShape(18.dp),
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (isLastExercise) Color(0xFF4CAF50) else Color(0xFF1565C0)
+                            containerColor = if (isEditingPastSet) Color(0xFFF57C00) 
+                                             else if (isLastExercise) Color(0xFF4CAF50) else Color(0xFF1565C0)
                         )
                     ) {
                         Text(
-                            if (isLastExercise) "🏁  FIN ENTRENAMIENTO" else "✓  TERMINAR CARDIO",
+                            if (isEditingPastSet) "✓  GUARDAR CAMBIOS" 
+                            else if (isLastExercise) "🏁  FIN ENTRENAMIENTO" else "✓  TERMINAR CARDIO",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                     }
-                    if (!isLastExercise) {
+                    if (!isLastExercise && !isEditingPastSet) {
                         TextButton(
                             onClick = { onFinishExercise() },
                             modifier = Modifier.fillMaxWidth()
@@ -641,7 +704,24 @@ fun ActiveExerciseFocusCard(
                     }
                 }
 
-                isLastExercise && isLastTargetSet -> {
+                isEditingPastSet -> {
+                    Button(
+                        onClick = {
+                            if (exerciseType == ExerciseType.TIMED)
+                                onUpdateTimedSet(durationText.toIntOrNull() ?: 0)
+                            else
+                                onUpdateStrengthSet(weightText.toDoubleOrNull() ?: 0.0, repsText.toIntOrNull() ?: 0, rir)
+                            onReturnToLatest()
+                        },
+                        modifier = Modifier.fillMaxWidth().height(60.dp),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF57C00))
+                    ) {
+                        Text("✓  GUARDAR CAMBIOS", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                    }
+                }
+
+                isLastExercise && setNumber >= targetSets -> {
                     Button(
                         onClick = {
                             if (exerciseType == ExerciseType.TIMED)
@@ -762,6 +842,7 @@ fun RirFocusButton(value: Int, isSelected: Boolean, onClick: () -> Unit, modifie
 fun RestOverlay(
     secondsLeft: Int,
     onSkip: () -> Unit,
+    onAdjustTime: (Int) -> Unit = {},
     nextSetInfo: String,
     restNextAction: String = "serie",
     onToggleNextAction: (String) -> Unit = {},
@@ -793,6 +874,30 @@ fun RestOverlay(
                 fontWeight = FontWeight.ExtraBold,
                 color = Primary
             )
+
+            // Botones de ajuste de tiempo
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = { onAdjustTime(-30) },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+                ) {
+                    Text("-30s", fontWeight = FontWeight.Bold)
+                }
+                
+                OutlinedButton(
+                    onClick = { onAdjustTime(30) },
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.White),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f))
+                ) {
+                    Text("+30s", fontWeight = FontWeight.Bold)
+                }
+            }
 
             // Mensaje motivacional / de estado
             if (restMessage.isNotEmpty()) {

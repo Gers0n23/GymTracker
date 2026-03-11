@@ -7,7 +7,11 @@
       "Bash(./gradlew.bat compileDebugKotlin:*)",
       "Bash(echo:*)",
       "Bash(./gradlew assembleDebug:*)",
-      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew:*)"
+      "Bash(JAVA_HOME=\"/c/Program Files/Android/Android Studio/jbr\" ./gradlew:*)",
+      "WebFetch(domain:firebase.google.com)",
+      "Bash(xargs grep:*)",
+      "WebFetch(domain:maven.google.com)",
+      "WebFetch(domain:dl.google.com)"
     ]
   }
 }

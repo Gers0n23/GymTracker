@@ -109,6 +109,9 @@ class ActiveSessionViewModel(
     // Timestamp de inicio real de la sesión (ms desde epoch). Se restaura del borrador si existe.
     private var startTimeMs: Long = System.currentTimeMillis()
 
+    // Tiempo objetivo exacto de finalización del descanso
+    private var targetRestEndTimeMs: Long = 0L
+
     private var timerJob: Job? = null
     private var restTimerJob: Job? = null
 
@@ -201,7 +204,8 @@ class ActiveSessionViewModel(
 
     fun startRestTimer() {
         restTimerJob?.cancel()
-        _restTimerSeconds.value = 90 // Default 90s rest
+        val defaultRest = 90
+        _restTimerSeconds.value = defaultRest
         _isResting.value = true
 
         val exercise = _exercises.value.getOrNull(_currentExerciseIndex.value)
@@ -218,15 +222,38 @@ class ActiveSessionViewModel(
         }
         _restMessage.value = message
 
-        scheduleRestAlarm(_restTimerSeconds.value + 2)
+        targetRestEndTimeMs = SystemClock.elapsedRealtime() + defaultRest * 1000L
+        scheduleRestAlarm(defaultRest)
 
+        startRestCoroutine()
+    }
+
+    private fun startRestCoroutine() {
+        restTimerJob?.cancel()
         restTimerJob = viewModelScope.launch {
-            while (_restTimerSeconds.value > 0) {
-                delay(1000)
-                _restTimerSeconds.value -= 1
+            while (true) {
+                val remainingMs = targetRestEndTimeMs - SystemClock.elapsedRealtime()
+                if (remainingMs <= 0) {
+                    _restTimerSeconds.value = 0
+                    break
+                }
+                _restTimerSeconds.value = (remainingMs / 1000).toInt() + 1
+                delay(200) // Verificación frecuente para evitar deriva y ser preciso
             }
             onRestComplete(skipped = false)
         }
+    }
+
+    fun adjustRestTime(deltaSeconds: Int) {
+        if (!_isResting.value) return
+        val currentRemainingSeconds = _restTimerSeconds.value
+        val newRemaining = (currentRemainingSeconds + deltaSeconds).coerceAtLeast(5)
+        
+        targetRestEndTimeMs = SystemClock.elapsedRealtime() + newRemaining * 1000L
+        _restTimerSeconds.value = newRemaining
+        
+        cancelRestAlarm()
+        scheduleRestAlarm(newRemaining)
     }
 
     fun skipRest() {
@@ -275,9 +302,40 @@ class ActiveSessionViewModel(
     fun nextExercise() {
         if (_currentExerciseIndex.value < _exercises.value.size - 1) {
             _currentExerciseIndex.value += 1
-            _currentSetNumber.value = 1
+            returnToLatestSet()
             saveDraft(currentRoutineId)
         }
+    }
+
+    fun selectExercise(index: Int) {
+        if (index in _exercises.value.indices) {
+            val isRestingBefore = _isResting.value
+            _currentExerciseIndex.value = index
+            returnToLatestSet()
+            saveDraft(currentRoutineId)
+            
+            // Si estaba descansando o no, no deberíamos cancelar el descanso al cambiar de ejercicio.
+            // Pero si queremos que al tocar otro ejercicio cancele el descanso:
+            if (isRestingBefore) {
+                // skipRest()
+                // Por ahora lo dejaremos seguir corriendo el descanso en background a menos que se quiera saltar.
+            }
+        }
+    }
+
+    fun selectSet(setNumber: Int) {
+        val exercise = _exercises.value.getOrNull(_currentExerciseIndex.value) ?: return
+        val currentSets = _sets.value[exercise.id] ?: emptyList()
+        if (setNumber in 1..currentSets.size) {
+            _currentSetNumber.value = setNumber
+        }
+    }
+
+    fun returnToLatestSet() {
+        val exercise = _exercises.value.getOrNull(_currentExerciseIndex.value) ?: return
+        val currentSets = _sets.value[exercise.id] ?: emptyList()
+        // El último elemento añadido en la lista de sets es precisamente el set actual en progreso
+        _currentSetNumber.value = maxOf(1, currentSets.size)
     }
 
     fun addSet(

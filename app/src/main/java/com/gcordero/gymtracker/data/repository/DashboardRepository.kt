@@ -5,6 +5,7 @@ import com.gcordero.gymtracker.domain.model.Routine
 import com.gcordero.gymtracker.domain.model.SetRecord
 import com.gcordero.gymtracker.domain.model.User
 import com.gcordero.gymtracker.domain.model.WorkoutSession
+import android.util.Log
 import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
@@ -41,9 +42,10 @@ class DashboardRepository(
                 .whereGreaterThanOrEqualTo("startTime", since)
                 .get().await()
                 .documents
-                .mapNotNull { it.toObject(WorkoutSession::class.java) }
+                .mapNotNull { it.toObject(WorkoutSession::class.java)?.copy(id = it.id) }
                 .sortedByDescending { it.startTime }
         } catch (e: Exception) {
+            Log.e("DashboardRepo", "getRecentSessions failed", e)
             emptyList()
         }
     }
@@ -60,9 +62,10 @@ class DashboardRepository(
                     .whereIn("sessionId", chunk)
                     .get().await()
                     .documents
-                    .mapNotNull { it.toObject(SetRecord::class.java) }
+                    .mapNotNull { it.toObject(SetRecord::class.java)?.copy(id = it.id) }
             }
         } catch (e: Exception) {
+            Log.e("DashboardRepo", "getSetRecordsForSessions failed", e)
             emptyList()
         }
     }

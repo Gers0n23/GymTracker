@@ -29,12 +29,23 @@ fun RoutinesScreen(
 ) {
     val routines by viewModel.routines.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val importState by viewModel.importState.collectAsState()
+
     var showAddDialog by remember { mutableStateOf(false) }
+    var showImportDialog by remember { mutableStateOf(false) }
     var routineToEdit by remember { mutableStateOf<Routine?>(null) }
     var routineToDelete by remember { mutableStateOf<Routine?>(null) }
 
     val sortedRoutines = remember(routines) {
         routines.sortedBy { it.daysOfWeek.firstOrNull() ?: 99 }
+    }
+
+    // Handle import result feedback
+    LaunchedEffect(importState) {
+        if (importState is ImportState.Success) {
+            showImportDialog = false
+            viewModel.clearImportState()
+        }
     }
 
     Scaffold(
@@ -49,6 +60,13 @@ fun RoutinesScreen(
                     )
                 },
                 actions = {
+                    IconButton(onClick = { showImportDialog = true }) {
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = "Importar rutina",
+                            tint = Primary.copy(alpha = 0.8f)
+                        )
+                    }
                     FilledTonalButton(
                         onClick = { showAddDialog = true },
                         colors = ButtonDefaults.filledTonalButtonColors(
@@ -116,6 +134,19 @@ fun RoutinesScreen(
         )
     }
 
+    if (showImportDialog) {
+        ImportRoutineDialog(
+            importState = importState,
+            onDismiss = {
+                showImportDialog = false
+                viewModel.clearImportState()
+            },
+            onConfirm = { text ->
+                viewModel.importRoutine(text)
+            }
+        )
+    }
+
     if (routineToEdit != null) {
         EditRoutineDialog(
             routine = routineToEdit!!,
@@ -149,6 +180,72 @@ fun RoutinesScreen(
             }
         )
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ImportRoutineDialog(
+    importState: ImportState,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var pastedText by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Importar Rutina") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    "Pega aquí el mensaje de rutina que alguien te compartió:",
+                    fontSize = 13.sp,
+                    color = Color.Gray
+                )
+                OutlinedTextField(
+                    value = pastedText,
+                    onValueChange = { pastedText = it },
+                    placeholder = { Text("Pega el texto aquí…", fontSize = 13.sp) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Primary,
+                        focusedLabelColor = Primary
+                    ),
+                    maxLines = 8
+                )
+                if (importState is ImportState.Error) {
+                    Text(
+                        text = importState.message,
+                        color = MaterialTheme.colorScheme.error,
+                        fontSize = 12.sp
+                    )
+                }
+                if (importState is ImportState.Success) {
+                    Text(
+                        text = "¡Rutina importada con éxito!",
+                        color = Primary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onConfirm(pastedText) },
+                enabled = pastedText.isNotBlank() && importState !is ImportState.Success,
+                colors = ButtonDefaults.buttonColors(containerColor = Primary)
+            ) {
+                Text("Importar", color = Color.Black)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancelar")
+            }
+        }
+    )
 }
 
 private fun dayOfWeekLabel(day: Int): String = when (day) {

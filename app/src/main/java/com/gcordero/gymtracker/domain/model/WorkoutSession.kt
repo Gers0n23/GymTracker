@@ -14,7 +14,8 @@ data class WorkoutSession(
     val rpe: Int? = null, // Rate of Perceived Exertion
     val sleepQuality: Int? = null, // 1–5
     val energyLevel: Int? = null,   // 1–5
-    val proteinConsumedPreviousDay: Int? = null // Track previous day's complete protein intake
+    val proteinConsumedPreviousDay: Int? = null, // Track previous day's complete protein intake
+    val caloriesBurned: Int = 0 // Estimated kcal burned during the session
 )
 
 data class SetRecord(

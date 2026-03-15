@@ -18,4 +18,5 @@ sealed class Screen(val route: String) {
     data object SessionDetail : Screen("session_detail/{sessionId}") {
         fun createRoute(sessionId: String) = "session_detail/$sessionId"
     }
+    data object Nutrition : Screen("nutrition")
 }

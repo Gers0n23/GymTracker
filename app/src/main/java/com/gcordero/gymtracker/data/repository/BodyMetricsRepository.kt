@@ -23,7 +23,9 @@ class BodyMetricsRepository(
                     return@addSnapshotListener
                 }
                 if (snapshot != null) {
-                    val metrics = snapshot.toObjects(BodyMetric::class.java)
+                    val metrics = snapshot.documents.mapNotNull { doc ->
+                        doc.toObject(BodyMetric::class.java)?.copy(id = doc.id)
+                    }
                     trySend(metrics)
                 }
             }
@@ -32,5 +34,15 @@ class BodyMetricsRepository(
 
     suspend fun addBodyMetric(metric: BodyMetric) {
         metricsCollection.add(metric).await()
+    }
+
+    suspend fun updateBodyMetric(metric: BodyMetric) {
+        if (metric.id.isNotEmpty()) {
+            metricsCollection.document(metric.id).set(metric).await()
+        }
+    }
+
+    suspend fun deleteBodyMetric(metricId: String) {
+        metricsCollection.document(metricId).delete().await()
     }
 }

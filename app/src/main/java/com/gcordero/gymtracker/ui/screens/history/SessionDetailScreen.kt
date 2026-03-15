@@ -176,6 +176,7 @@ fun SessionComparisonCard(
     editableSets: Map<String, List<SetRecord>>,
     previousSets: Map<String, List<SetRecord>>
 ) {
+    // Para STRENGTH: peso × reps. Para CARDIO/TIMED: no aplica volumen en kg, se omite del comparativo.
     val currVolume = editableSets.values.flatten().sumOf { it.weight * it.reps }
     val prevVolume = previousSets.values.flatten().sumOf { it.weight * it.reps }
     val volDelta = currVolume - prevVolume
@@ -304,6 +305,13 @@ fun SessionSummaryCard(session: WorkoutSession) {
                         color = Color(0xFFFFD600)
                     )
                 }
+                if (session.caloriesBurned > 0) {
+                    SummaryStatItem(
+                        label = "Calorías",
+                        value = "${session.caloriesBurned} kcal",
+                        color = Color(0xFFFF7043)
+                    )
+                }
             }
             // Sleep & Energy
             if (session.sleepQuality != null || session.energyLevel != null) {
@@ -344,6 +352,18 @@ fun SummaryStatItem(label: String, value: String, color: Color) {
     }
 }
 
+/** Convierte segundos a formato legible para la pantalla de detalle */
+private fun formatDurationDetail(seconds: Int): String {
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
+    val s = seconds % 60
+    return when {
+        h > 0 -> "${h}h ${m}m"
+        m > 0 -> "${m}m ${s}s"
+        else  -> "${s}s"
+    }
+}
+
 @Composable
 fun ExerciseEditCard(
     exerciseName: String,
@@ -353,82 +373,175 @@ fun ExerciseEditCard(
     onRepsChange: (Int, Int) -> Unit,
     onRirChange: (Int, Int?) -> Unit
 ) {
-    // Mejor serie (max peso) de la sesión anterior
-    val prevBestSet = previousSets
-        ?.filter { it.weight > 0 }
-        ?.maxByOrNull { it.weight }
-
-    val currBestWeight = sets.filter { it.weight > 0 }.maxOfOrNull { it.weight } ?: 0.0
-    val weightDelta = if (prevBestSet != null) currBestWeight - prevBestSet.weight else null
+    // Inferir tipo desde el primer set
+    val firstSet = sets.firstOrNull()
+    val isCardio = firstSet?.speedKmh != null
+    val isTimed  = !isCardio && firstSet?.durationSeconds != null
 
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            // Header: nombre + comparativa de peso
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Text(
-                    exerciseName,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    modifier = Modifier.weight(1f)
-                )
-                if (prevBestSet != null && weightDelta != null) {
-                    val deltaColor = when {
-                        weightDelta > 0 -> Color(0xFF4CAF50)
-                        weightDelta < 0 -> Color(0xFFCF6679)
-                        else -> Color.Gray
+            // Header: nombre del ejercicio
+            Text(
+                exerciseName,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White
+            )
+
+            when {
+                isCardio -> {
+                    // CARDIO — mostrar tabla de velocidad/inclinación/duración
+                    Divider(color = Color.White.copy(alpha = 0.1f))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("#",          fontSize = 11.sp, color = Color.Gray, modifier = Modifier.width(28.dp))
+                        Text("Velocidad",  fontSize = 11.sp, color = Color.Gray, modifier = Modifier.weight(1f))
+                        Text("Incl. %",   fontSize = 11.sp, color = Color.Gray, modifier = Modifier.weight(1f))
+                        Text("Duración",  fontSize = 11.sp, color = Color.Gray, modifier = Modifier.weight(1f))
+                        Text("Dist.",     fontSize = 11.sp, color = Color.Gray, modifier = Modifier.weight(1f))
                     }
-                    val deltaText = when {
-                        weightDelta > 0 -> "+${weightDelta.toInt()}kg"
-                        weightDelta < 0 -> "${weightDelta.toInt()}kg"
-                        else -> "="
+                    sets.forEach { set ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Surface(
+                                color = Color(0xFF6366F1).copy(alpha = 0.2f),
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier.width(28.dp)
+                            ) {
+                                Text(
+                                    "${set.setNumber}",
+                                    modifier = Modifier.padding(4.dp),
+                                    color = Color(0xFF818CF8),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
+                                )
+                            }
+                            Text(
+                                "${set.speedKmh ?: "-"} km/h",
+                                fontSize = 13.sp,
+                                color = Color.White,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                "${set.inclinePercent?.toInt() ?: 0}%",
+                                fontSize = 13.sp,
+                                color = Color.White,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                set.durationSeconds?.let { formatDurationDetail(it) } ?: "-",
+                                fontSize = 13.sp,
+                                color = Color.White,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                set.distanceKm?.let { "%.2f km".format(it) } ?: "-",
+                                fontSize = 13.sp,
+                                color = Secondary,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
-                    Text(
-                        deltaText,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = deltaColor
-                    )
                 }
-            }
 
-            // Referencia de sesión anterior
-            if (prevBestSet != null) {
-                Text(
-                    "Anterior: ${prevBestSet.weight.toInt()}kg × ${prevBestSet.reps} reps" +
-                        if (prevBestSet.rir != null) " · RIR ${prevBestSet.rir}" else "",
-                    fontSize = 11.sp,
-                    color = Color.Gray
-                )
-            }
+                isTimed -> {
+                    // TIMED — mostrar solo duración por serie
+                    Divider(color = Color.White.copy(alpha = 0.1f))
+                    // Referencia anterior
+                    val prevBestDur = previousSets?.mapNotNull { it.durationSeconds }?.maxOrNull()
+                    if (prevBestDur != null) {
+                        Text(
+                            "Anterior: ${formatDurationDetail(prevBestDur)}",
+                            fontSize = 11.sp,
+                            color = Color.Gray
+                        )
+                    }
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Serie",    fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(40.dp))
+                        Text("Duración", fontSize = 12.sp, color = Color.Gray)
+                    }
+                    sets.forEach { set ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Surface(
+                                color = Secondary.copy(alpha = 0.2f),
+                                shape = MaterialTheme.shapes.small,
+                                modifier = Modifier.width(40.dp)
+                            ) {
+                                Text(
+                                    "${set.setNumber}",
+                                    modifier = Modifier.padding(6.dp),
+                                    color = Secondary,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp
+                                )
+                            }
+                            Text(
+                                set.durationSeconds?.let { formatDurationDetail(it) } ?: "-",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
 
-            Divider(color = Color.White.copy(alpha = 0.1f))
+                else -> {
+                    // STRENGTH — comportamiento original con edición
+                    val prevBestSet = previousSets
+                        ?.filter { it.weight > 0 }
+                        ?.maxByOrNull { it.weight }
+                    val currBestWeight = sets.filter { it.weight > 0 }.maxOfOrNull { it.weight } ?: 0.0
+                    val weightDelta = if (prevBestSet != null) currBestWeight - prevBestSet.weight else null
 
-            // Header row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text("Serie", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(40.dp))
-                Text("Peso (kg)", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(80.dp))
-                Text("Reps", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(60.dp))
-                Text("RIR", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(50.dp))
-            }
+                    if (prevBestSet != null && weightDelta != null) {
+                        val deltaColor = when {
+                            weightDelta > 0 -> Color(0xFF4CAF50)
+                            weightDelta < 0 -> Color(0xFFCF6679)
+                            else -> Color.Gray
+                        }
+                        val deltaText = when {
+                            weightDelta > 0 -> "+${weightDelta.toInt()}kg"
+                            weightDelta < 0 -> "${weightDelta.toInt()}kg"
+                            else -> "="
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Text(
+                                "Anterior: ${prevBestSet.weight.toInt()}kg × ${prevBestSet.reps}" +
+                                    if (prevBestSet.rir != null) " · RIR ${prevBestSet.rir}" else "",
+                                fontSize = 11.sp,
+                                color = Color.Gray
+                            )
+                            Text(deltaText, fontSize = 13.sp, fontWeight = FontWeight.Bold, color = deltaColor)
+                        }
+                    }
 
-            sets.forEachIndexed { index, set ->
-                EditableSetRow(
-                    setNumber = set.setNumber,
-                    weight = set.weight,
-                    reps = set.reps,
-                    rir = set.rir,
-                    onWeightChange = { onWeightChange(index, it) },
-                    onRepsChange = { onRepsChange(index, it) },
-                    onRirChange = { onRirChange(index, it) }
-                )
+                    Divider(color = Color.White.copy(alpha = 0.1f))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Serie",    fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(40.dp))
+                        Text("Peso (kg)",fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(80.dp))
+                        Text("Reps",     fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(60.dp))
+                        Text("RIR",      fontSize = 12.sp, color = Color.Gray, modifier = Modifier.width(50.dp))
+                    }
+
+                    sets.forEachIndexed { index, set ->
+                        EditableSetRow(
+                            setNumber = set.setNumber,
+                            weight = set.weight,
+                            reps = set.reps,
+                            rir = set.rir,
+                            onWeightChange = { onWeightChange(index, it) },
+                            onRepsChange = { onRepsChange(index, it) },
+                            onRirChange = { onRirChange(index, it) }
+                        )
+                    }
+                }
             }
         }
     }

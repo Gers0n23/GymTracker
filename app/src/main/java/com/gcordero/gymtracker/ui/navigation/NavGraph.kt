@@ -30,6 +30,7 @@ import com.gcordero.gymtracker.ui.screens.metrics.BodyMetricsScreen
 import com.gcordero.gymtracker.ui.screens.history.WorkoutHistoryScreen
 import com.gcordero.gymtracker.ui.screens.history.SessionDetailScreen
 import com.gcordero.gymtracker.ui.screens.onboarding.OnboardingScreen
+import com.gcordero.gymtracker.ui.screens.nutrition.NutritionScreen
 
 // Simple in-memory holder to pass WorkoutSession object between screens without serialization
 object SessionHolder {
@@ -182,6 +183,7 @@ fun NavGraph(
             }
         }
         composable(Screen.BodyMetrics.route)  { BodyMetricsScreen() }
+        composable(Screen.Nutrition.route)    { NutritionScreen() }
         composable(Screen.Progression.route)  { Text("Progression Screen") }
 
         // ── Historial ───────────────────────────────────────────────────────

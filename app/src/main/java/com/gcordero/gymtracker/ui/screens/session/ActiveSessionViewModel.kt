@@ -418,11 +418,53 @@ class ActiveSessionViewModel(
         cancelRestAlarm()
     }
 
+    /**
+     * Estima calorías quemadas usando fórmulas MET por tipo de ejercicio (inferido de los campos):
+     * - CARDIO (speedKmh != null): fórmula ACSM para cinta/cardio con velocidad e inclinación.
+     * - TIMED (durationSeconds != null, speedKmh == null): MET fijo 3.5 (planchas, isométricos).
+     * - STRENGTH: MET 5.0 aplicado al tiempo de sesión no cubierto por CARDIO/TIMED.
+     */
+    private fun calculateCaloriesBurned(
+        allSets: List<SetRecord>,
+        bodyWeightKg: Double,
+        totalDurationMinutes: Double
+    ): Int {
+        var calories = 0.0
+        val cardioSets = allSets.filter { it.speedKmh != null && it.durationSeconds != null }
+        val timedSets  = allSets.filter { it.speedKmh == null && it.durationSeconds != null }
+
+        // CARDIO — fórmula ACSM: VO2 (mL/kg/min) = 0.1*speed_m_min + 1.8*speed_m_min*grade + 3.5
+        cardioSets.forEach { set ->
+            val speedMMin = (set.speedKmh!! * 1000.0) / 60.0
+            val grade     = (set.inclinePercent ?: 0.0) / 100.0
+            val vo2       = 0.1 * speedMMin + 1.8 * speedMMin * grade + 3.5
+            val met       = vo2 / 3.5
+            calories += met * bodyWeightKg * (set.durationSeconds!! / 3600.0)
+        }
+        // TIMED — plancha/isométrico: MET 3.5
+        timedSets.forEach { set ->
+            calories += 3.5 * bodyWeightKg * (set.durationSeconds!! / 3600.0)
+        }
+        // STRENGTH — MET 5.0 para el tiempo restante de la sesión
+        val cardioMinutes   = cardioSets.sumOf { it.durationSeconds!! } / 60.0
+        val timedMinutes    = timedSets.sumOf  { it.durationSeconds!! } / 60.0
+        val strengthMinutes = (totalDurationMinutes - cardioMinutes - timedMinutes).coerceAtLeast(0.0)
+        calories += 5.0 * bodyWeightKg * (strengthMinutes / 60.0)
+
+        return calories.toInt().coerceAtLeast(0)
+    }
+
     fun finishSession(routineId: String) {
         val userId = auth.currentUser?.uid ?: "test_user"
         val allSets = _sets.value.values.flatten()
         val totalWeight = allSets.sumOf { it.weight * it.reps }
         val name = _routineName.value.ifEmpty { "Entrenamiento" }
+
+        val durationMinutes = (System.currentTimeMillis() - startTimeMs) / 60000.0
+        val prefs = getApplication<Application>()
+            .getSharedPreferences("body_prefs_$userId", android.content.Context.MODE_PRIVATE)
+        val bodyWeightKg = prefs.getFloat("latest_weight_kg", 70f).toDouble()
+        val caloriesBurned = calculateCaloriesBurned(allSets, bodyWeightKg, durationMinutes)
 
         val session = WorkoutSession(
             userId = userId,
@@ -430,7 +472,8 @@ class ActiveSessionViewModel(
             routineName = name,
             startTime = Timestamp(Date(startTimeMs)),
             endTime = Timestamp.now(),
-            totalWeightLifted = totalWeight
+            totalWeightLifted = totalWeight,
+            caloriesBurned = caloriesBurned
         )
 
         viewModelScope.launch {

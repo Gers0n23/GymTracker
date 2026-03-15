@@ -4,8 +4,10 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -54,7 +56,9 @@ fun RoutineDetailScreen(
     val catalogExercises by viewModel.catalogExercises.collectAsState()
     val catalogMuscleGroups by viewModel.catalogMuscleGroups.collectAsState()
     val isCatalogLoading by viewModel.isCatalogLoading.collectAsState()
-    
+    val analysisState by viewModel.analysisState.collectAsState()
+
+    val context = LocalContext.current
     var showExercisePicker by remember { mutableStateOf(false) }
     var showEditRoutineDialog by remember { mutableStateOf(false) }
     var exerciseToEdit by remember { mutableStateOf<Exercise?>(null) }
@@ -121,6 +125,31 @@ fun RoutineDetailScreen(
                                     showEditRoutineDialog = true
                                 }
                             )
+                            DropdownMenuItem(
+                                text = { Text("Exportar / Compartir") },
+                                leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                onClick = {
+                                    showHeaderMenu = false
+                                    val exportText = viewModel.getExportText()
+                                    if (exportText != null) {
+                                        val intent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(Intent.EXTRA_TEXT, exportText)
+                                            putExtra(Intent.EXTRA_SUBJECT, "Rutina: ${routine?.name}")
+                                        }
+                                        context.startActivity(Intent.createChooser(intent, "Compartir rutina"))
+                                    }
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Analizar con IA") },
+                                leadingIcon = { Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Primary) },
+                                onClick = {
+                                    showHeaderMenu = false
+                                    viewModel.analyzeRoutine()
+                                }
+                            )
+                            HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text("Eliminar Rutina", color = Color.Red) },
                                 leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color.Red) },
@@ -252,6 +281,63 @@ fun RoutineDetailScreen(
                 }
             }
         )
+    }
+
+    // Gemini analysis dialog
+    when (val state = analysisState) {
+        is RoutineAnalysisState.Loading -> {
+            AlertDialog(
+                onDismissRequest = {},
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Primary, strokeWidth = 2.dp)
+                        Text("Analizando rutina…")
+                    }
+                },
+                text = { Text("Gemini está revisando tu rutina. Esto puede tardar unos segundos.", color = Color.Gray, fontSize = 13.sp) },
+                confirmButton = {}
+            )
+        }
+        is RoutineAnalysisState.Result -> {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissAnalysis() },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Primary, modifier = Modifier.size(20.dp))
+                        Text("Análisis IA", fontWeight = FontWeight.Bold)
+                    }
+                },
+                text = {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                        Text(
+                            text = state.text,
+                            fontSize = 13.sp,
+                            lineHeight = 20.sp,
+                            color = Color(0xFFDDDDDD)
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = { viewModel.dismissAnalysis() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                    ) {
+                        Text("Cerrar", color = Color.Black)
+                    }
+                }
+            )
+        }
+        is RoutineAnalysisState.Error -> {
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissAnalysis() },
+                title = { Text("Error al analizar") },
+                text = { Text(state.message, fontSize = 13.sp) },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.dismissAnalysis() }) { Text("OK") }
+                }
+            )
+        }
+        else -> {}
     }
 }
 

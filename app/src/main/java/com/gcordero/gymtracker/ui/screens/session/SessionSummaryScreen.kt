@@ -107,14 +107,36 @@ fun SessionSummaryScreen(
                         modifier = Modifier.fillMaxWidth(),
                         containerColor = MaterialTheme.colorScheme.surface
                     ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("VOLUMEN TOTAL", fontSize = 12.sp, color = Color.Gray)
-                            Text(
-                                "${session.totalWeightLifted.toInt()} kg",
-                                fontSize = 36.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = Primary
-                            )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("VOLUMEN TOTAL", fontSize = 11.sp, color = Color.Gray)
+                                Text(
+                                    "${session.totalWeightLifted.toInt()} kg",
+                                    fontSize = 30.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Primary
+                                )
+                            }
+                            if (session.caloriesBurned > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .height(56.dp)
+                                        .width(1.dp)
+                                        .background(Color.White.copy(alpha = 0.1f))
+                                )
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text("CALORÍAS", fontSize = 11.sp, color = Color.Gray)
+                                    Text(
+                                        "${session.caloriesBurned} kcal",
+                                        fontSize = 30.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFFFF7043)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -259,9 +281,47 @@ fun SessionSummaryScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text("Serie ${set.setNumber}", fontSize = 12.sp, color = Color.Gray)
-                                    Text("${set.weight.toInt()}kg x ${set.reps}", fontWeight = FontWeight.Bold, color = Color.White)
-                                    if (set.rir != null) {
-                                        Text("RIR ${set.rir}", fontSize = 12.sp, color = Secondary)
+                                    when {
+                                        // CARDIO: velocidad + inclinación + distancia
+                                        set.speedKmh != null -> {
+                                            val distText = set.distanceKm?.let {
+                                                " · %.2f km".format(it)
+                                            } ?: ""
+                                            val inclineText = if ((set.inclinePercent ?: 0.0) > 0)
+                                                " / ${set.inclinePercent?.toInt()}%"
+                                            else ""
+                                            Text(
+                                                "${set.speedKmh} km/h$inclineText$distText",
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                            set.durationSeconds?.let { dur ->
+                                                Text(
+                                                    formatDuration(dur),
+                                                    fontSize = 12.sp,
+                                                    color = Secondary
+                                                )
+                                            }
+                                        }
+                                        // TIMED: solo duración
+                                        set.durationSeconds != null -> {
+                                            Text(
+                                                formatDuration(set.durationSeconds),
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                        }
+                                        // STRENGTH: peso × reps
+                                        else -> {
+                                            Text(
+                                                "${set.weight.toInt()} kg × ${set.reps}",
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color.White
+                                            )
+                                            if (set.rir != null) {
+                                                Text("RIR ${set.rir}", fontSize = 12.sp, color = Secondary)
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -290,6 +350,18 @@ fun SessionSummaryScreen(
                 }
             }
         }
+    }
+}
+
+/** Convierte segundos a formato legible: "1h 30m" o "2m 30s" */
+private fun formatDuration(seconds: Int): String {
+    val h = seconds / 3600
+    val m = (seconds % 3600) / 60
+    val s = seconds % 60
+    return when {
+        h > 0  -> "${h}h ${m}m"
+        m > 0  -> "${m}m ${s}s"
+        else   -> "${s}s"
     }
 }
 

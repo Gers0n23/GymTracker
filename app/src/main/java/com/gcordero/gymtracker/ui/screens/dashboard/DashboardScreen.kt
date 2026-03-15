@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.ExitToApp
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Restaurant
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -119,6 +120,9 @@ fun DashboardScreen(
                 NavigationBarItem(false, {
                     navController.navigate(Screen.WorkoutHistory.route) { launchSingleTop = true }
                 }, icon = { Icon(Icons.Default.List,   null) }, label = { Text("Historial") }, colors = nc)
+                NavigationBarItem(false, {
+                    navController.navigate(Screen.Nutrition.route) { launchSingleTop = true }
+                }, icon = { Icon(Icons.Default.Restaurant, null) }, label = { Text("Nutrición") }, colors = nc)
                 NavigationBarItem(false, {
                     navController.navigate(Screen.BodyMetrics.route) { launchSingleTop = true }
                 }, icon = { Icon(Icons.Default.Person, null) }, label = { Text("Perfil") },    colors = nc)

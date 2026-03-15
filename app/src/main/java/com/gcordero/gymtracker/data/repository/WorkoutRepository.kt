@@ -2,12 +2,14 @@ package com.gcordero.gymtracker.data.repository
 
 import com.gcordero.gymtracker.domain.model.SetRecord
 import com.gcordero.gymtracker.domain.model.WorkoutSession
+import com.google.firebase.Timestamp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import java.util.Calendar
 
 class WorkoutRepository(
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
@@ -97,6 +99,25 @@ class WorkoutRepository(
         val previousSession = sessions.firstOrNull { it.id != currentSessionId }
             ?: return emptyList()
         return getSetsBySession(previousSession.id)
+    }
+
+    /**
+     * Devuelve el total de calorías quemadas hoy (todas las sesiones del día para el usuario).
+     */
+    suspend fun getTodayCaloriesBurned(userId: String): Int {
+        val cal = Calendar.getInstance().apply {
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }
+        val startOfDay = Timestamp(cal.time)
+        return sessionsCollection
+            .whereEqualTo("userId", userId)
+            .whereGreaterThanOrEqualTo("startTime", startOfDay)
+            .get()
+            .await()
+            .documents
+            .mapNotNull { it.toObject(WorkoutSession::class.java) }
+            .sumOf { it.caloriesBurned }
     }
 
     /**

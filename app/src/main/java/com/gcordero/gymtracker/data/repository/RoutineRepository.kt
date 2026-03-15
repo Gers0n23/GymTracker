@@ -30,10 +30,11 @@ class RoutineRepository(
         awaitClose { subscription.remove() }
     }
 
-    suspend fun addRoutine(routine: Routine) {
+    suspend fun addRoutine(routine: Routine): String {
         val docRef = routinesCollection.document()
         val routineWithId = routine.copy(id = docRef.id)
         docRef.set(routineWithId).await()
+        return docRef.id
     }
 
     suspend fun updateRoutine(routine: Routine) {

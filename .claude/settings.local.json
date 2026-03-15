@@ -11,7 +11,8 @@
       "WebFetch(domain:firebase.google.com)",
       "Bash(xargs grep:*)",
       "WebFetch(domain:maven.google.com)",
-      "WebFetch(domain:dl.google.com)"
+      "WebFetch(domain:dl.google.com)",
+      "Bash(./gradlew :app:compileDebugKotlin --no-daemon)"
     ]
   }
 }

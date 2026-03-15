@@ -11,5 +11,7 @@ data class NutritionLog(
     val carbsG: Double = 0.0,
     val fatG: Double = 0.0,
     val fiberG: Double = 0.0,
+    val mealType: String = MealType.SNACK.name,
+    val dateKey: String = "",
     val timestamp: Timestamp = Timestamp.now()
 )

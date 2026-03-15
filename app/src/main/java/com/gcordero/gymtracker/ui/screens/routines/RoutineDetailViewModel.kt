@@ -5,13 +5,25 @@ import androidx.lifecycle.viewModelScope
 import com.gcordero.gymtracker.data.repository.ExerciseCatalogRepository
 import com.gcordero.gymtracker.data.repository.ExerciseRepository
 import com.gcordero.gymtracker.data.repository.RoutineRepository
+import com.gcordero.gymtracker.data.util.RoutineExportUtil
 import com.gcordero.gymtracker.domain.model.CatalogExercise
 import com.gcordero.gymtracker.domain.model.Exercise
 import com.gcordero.gymtracker.domain.model.Routine
+import com.google.firebase.Firebase
+import com.google.firebase.ai.ai
+import com.google.firebase.ai.type.GenerativeBackend
+import com.google.firebase.ai.type.content
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+sealed class RoutineAnalysisState {
+    object Idle : RoutineAnalysisState()
+    object Loading : RoutineAnalysisState()
+    data class Result(val text: String) : RoutineAnalysisState()
+    data class Error(val message: String) : RoutineAnalysisState()
+}
 
 class RoutineDetailViewModel(
     private val routineRepository: RoutineRepository = RoutineRepository(),
@@ -38,11 +50,19 @@ class RoutineDetailViewModel(
     private val _isCatalogLoading = MutableStateFlow(false)
     val isCatalogLoading: StateFlow<Boolean> = _isCatalogLoading.asStateFlow()
 
+    private val _analysisState = MutableStateFlow<RoutineAnalysisState>(RoutineAnalysisState.Idle)
+    val analysisState: StateFlow<RoutineAnalysisState> = _analysisState.asStateFlow()
+
+    private val geminiModel by lazy {
+        Firebase.ai(backend = GenerativeBackend.googleAI())
+            .generativeModel("gemini-2.5-flash-lite")
+    }
+
     fun loadRoutineDetail(routineId: String) {
         viewModelScope.launch {
             _isLoading.value = true
-            
-            // Fecth routine object
+
+            // Fetch routine object
             val routineObj = routineRepository.getRoutineById(routineId)
             _routine.value = routineObj
 
@@ -59,6 +79,47 @@ class RoutineDetailViewModel(
             _catalogMuscleGroups.value = all.map { it.muscleGroup }.distinct().sorted()
             _isCatalogLoading.value = false
         }
+    }
+
+    fun getExportText(): String? {
+        val routine = _routine.value ?: return null
+        val exercises = _exercises.value
+        return RoutineExportUtil.serialize(routine, exercises)
+    }
+
+    fun analyzeRoutine() {
+        val routine = _routine.value ?: return
+        val exercises = _exercises.value
+        if (exercises.isEmpty()) {
+            _analysisState.value = RoutineAnalysisState.Error("Añade ejercicios a la rutina antes de analizarla.")
+            return
+        }
+        _analysisState.value = RoutineAnalysisState.Loading
+        viewModelScope.launch {
+            runCatching {
+                val json = RoutineExportUtil.toAnalysisJson(routine, exercises)
+                val prompt = """
+                    Eres un experto en fitness y ciencias del ejercicio. Analiza esta rutina de entrenamiento y proporciona en español:
+
+                    1. **Evaluación general** (2-3 oraciones): balance, distribución muscular, puntos fuertes y débiles.
+                    2. **Posibles problemas**: sobreentrenamiento, músculos descuidados, secuencia subóptima.
+                    3. **Sugerencias concretas** (numeradas): cambios específicos con justificación breve.
+                    4. **Calificación**: X/10 con una frase de resumen.
+
+                    Sé directo, práctico y específico. Usa viñetas donde corresponda.
+
+                    RUTINA:
+                    $json
+                """.trimIndent()
+                val response = geminiModel.generateContent(content { text(prompt) })
+                response.text?.trim() ?: throw Exception("Respuesta vacía de Gemini")
+            }.onSuccess { _analysisState.value = RoutineAnalysisState.Result(it) }
+             .onFailure { _analysisState.value = RoutineAnalysisState.Error(it.message ?: "Error desconocido") }
+        }
+    }
+
+    fun dismissAnalysis() {
+        _analysisState.value = RoutineAnalysisState.Idle
     }
 
     fun updateRoutine(routineId: String, name: String, description: String) {
